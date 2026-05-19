@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, UploadFile
@@ -14,9 +15,14 @@ from acoustic_analysis.serialize import result_to_payload
 
 app = FastAPI(title="Acoustic Analysis API", version="0.1.0")
 
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+_cors_origins = [
+    o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

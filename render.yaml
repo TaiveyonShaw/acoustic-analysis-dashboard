@@ -1,0 +1,13 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Connect this repo in the Render dashboard and apply the blueprint, or set these
+# values manually when creating a new Web Service.
+services:
+  - type: web
+    name: acoustic-analysis-dashboard
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        value: http://localhost:5173,http://127.0.0.1:5173

@@ -1,4 +1,5 @@
-const API = "/api";
+/** Same-origin on Render; override with VITE_API_URL for split deploy (e.g. Netlify UI). */
+const API = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 export async function analyzeWav(file, settings, signal) {
   const form = new FormData();

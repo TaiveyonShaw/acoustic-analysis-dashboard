@@ -1,0 +1,16 @@
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.git
+.gitignore
+*.wav
+frontend/node_modules
+.streamlit
+.DS_Store
+*.md
+!README.md
