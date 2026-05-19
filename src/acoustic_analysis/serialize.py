@@ -52,7 +52,7 @@ def result_to_payload(result: AnalysisResult) -> dict:
         "spectrogram": {
             "times": _round_list(spec_times.tolist()),
             "freqs": _round_list(spec_freqs.tolist()),
-            "db": _round_list(spec.tolist()),
+            "db": _round_matrix(spec.tolist()),
         },
         "anomaly": {
             "times": _round_list(result.times.tolist()),
@@ -81,3 +81,7 @@ def _decimate_axis(axis: np.ndarray, target_len: int) -> np.ndarray:
 
 def _round_list(values: list, decimals: int = 5) -> list:
     return [round(float(v), decimals) for v in values]
+
+
+def _round_matrix(rows: list, decimals: int = 5) -> list:
+    return [[round(float(v), decimals) for v in row] for row in rows]
