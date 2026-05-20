@@ -1,6 +1,6 @@
 # Acoustic Analysis Dashboard
 
-Interactive **React** dashboard for **outlier detection** in hearing-aid WAV recordings. A FastAPI backend runs librosa/scikit-learn analysis; the frontend renders charts with **Canvas** (no Plotly/Recharts) for a small bundle and fast paint.
+Interactive **React** dashboard for hearing-aid acoustic analysis: **WAV** frame-level outlier detection and **OSF thestruct MAT** files (ILD/ITD spatial maps). A FastAPI backend runs librosa/scikit-learn analysis; the frontend renders charts with **Canvas** (no Plotly/Recharts) for a small bundle and fast paint.
 
 ## Architecture
 
@@ -90,7 +90,27 @@ streamlit run app.py
 
 ## API
 
-`POST /api/analyze` — multipart form: `file` (WAV), `frame_length`, `hop_length`, `method`, `contamination`, `z_threshold`, `iqr_multiplier`.
+`POST /api/analyze` — multipart form:
+
+| Field | Purpose |
+|-------|---------|
+| `file` | `.wav` recording or OSF `.mat` thestruct file |
+| `record_index` | For MAT files: which of the 63 aid/room/run records to visualize (0–62) |
+| `frame_length`, `hop_length` | WAV analysis only |
+| `method`, `contamination`, `z_threshold`, `iqr_multiplier` | Outlier detector settings |
+
+### MAT (thestruct) format
+
+Each OSF `thestruct_*.mat` file contains one variable (e.g. `thestruct_MoreA1`) with **63 records**. Every record is a MATLAB struct with:
+
+| Field | Description |
+|-------|-------------|
+| `subject`, `aid`, `room`, `cond`, `run` | Metadata (e.g. Occ/Open/Unaid, Ane/SRS/Room, runs mean–6) |
+| `azimuths` | 11 azimuth angles (degrees) |
+| `freqs` | 28 frequency bins (Hz) |
+| `rawILD`, `normILD`, `rawITD`, `normITD` | 11×28 matrices |
+
+Sample data lives in `osf-storage/More_thestructs/` and `osf-storage/Opn_thestructs/`.
 
 ## Library usage
 

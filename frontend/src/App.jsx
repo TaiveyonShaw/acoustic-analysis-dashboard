@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { analyzeWav, downloadText, rowsToCsv } from "./api";
+import { analyzeFile, downloadText, rowsToCsv } from "./api";
 import Sidebar from "./components/Sidebar";
 import Metrics from "./components/Metrics";
 import WaveformChart from "./components/WaveformChart";
@@ -7,6 +7,7 @@ import SpectrogramChart from "./components/SpectrogramChart";
 import AnomalyChart from "./components/AnomalyChart";
 import FeatureCharts from "./components/FeatureCharts";
 import RegionsTable from "./components/RegionsTable";
+import ThestructView from "./components/ThestructView";
 
 const DEFAULT_SETTINGS = {
   frameLength: 2048,
@@ -23,11 +24,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("overview");
+  const [recordIndex, setRecordIndex] = useState(0);
 
   const fileRef = useRef(null);
   const abortRef = useRef(null);
 
-  const runAnalysis = useCallback(async (file, cfg) => {
+  const isThestruct = data?.dataType === "thestruct";
+
+  const runAnalysis = useCallback(async (file, cfg, idx = 0) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -35,8 +39,13 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const result = await analyzeWav(file, cfg, controller.signal);
+      const result = await analyzeFile(file, cfg, controller.signal, {
+        recordIndex: idx,
+      });
       setData(result);
+      if (result.dataType === "thestruct") {
+        setRecordIndex(result.summary?.selectedIndex ?? idx);
+      }
     } catch (err) {
       if (err.name === "AbortError") return;
       setError(err.message || "Analysis failed");
@@ -50,20 +59,30 @@ export default function App() {
   const onFile = useCallback(
     (file) => {
       fileRef.current = file;
-      runAnalysis(file, settings);
+      setRecordIndex(0);
+      runAnalysis(file, settings, 0);
     },
     [runAnalysis, settings]
   );
 
   useEffect(() => {
     if (!fileRef.current) return;
+    const isMat = fileRef.current.name?.toLowerCase().endsWith(".mat");
     const timer = setTimeout(() => {
-      runAnalysis(fileRef.current, settings);
+      runAnalysis(fileRef.current, settings, isMat ? recordIndex : 0);
     }, 350);
     return () => clearTimeout(timer);
-  }, [settings, runAnalysis]);
+  }, [settings, recordIndex, runAnalysis]);
+
+  const onSelectRecord = useCallback((index) => {
+    setRecordIndex(index);
+  }, []);
 
   const exportFeatures = () => {
+    if (isThestruct) {
+      exportThestructMatrix();
+      return;
+    }
     const series = data?.allFeatures ?? data?.features;
     if (!series?.length || !data?.anomaly) return;
     const rows = series[0].times.map((t, i) => {
@@ -76,7 +95,43 @@ export default function App() {
     downloadText(`${data.fileName}_features.csv`, rowsToCsv(rows));
   };
 
+  const exportThestructMatrix = () => {
+    const { selected, matrices, fileName } = data;
+    if (!selected?.freqs?.length || !matrices?.normILD) return;
+    const azimuths = selected.azimuths ?? [];
+    const rows = [];
+    for (let a = 0; a < azimuths.length; a++) {
+      for (let f = 0; f < selected.freqs.length; f++) {
+        rows.push({
+          azimuth_deg: azimuths[a],
+          freq_hz: selected.freqs[f],
+          norm_ild_db: matrices.normILD[a][f],
+          norm_itd_us: matrices.normITD[a][f],
+          raw_ild_db: matrices.rawILD[a][f],
+          raw_itd_us: matrices.rawITD[a][f],
+        });
+      }
+    }
+    const label = selected.label.replace(/\s+/g, "_");
+    downloadText(`${fileName}_${label}.csv`, rowsToCsv(rows));
+  };
+
   const exportRegions = () => {
+    if (isThestruct) {
+      if (!data?.records?.length) return;
+      const rows = data.records.map((r) => ({
+        index: r.index,
+        subject: r.subject,
+        aid: r.aid,
+        room: r.room,
+        cond: r.cond,
+        run: r.run,
+        anomaly_score: r.anomalyScore,
+        is_outlier: r.isOutlier,
+      }));
+      downloadText(`${data.fileName}_records.csv`, rowsToCsv(rows));
+      return;
+    }
     if (!data?.regions?.length) return;
     const rows = data.regions.map((r) => ({
       start_s: r.start_s,
@@ -95,31 +150,43 @@ export default function App() {
         onFile={onFile}
         loading={loading}
         error={error}
+        dataType={data?.dataType}
+        thestructRecords={isThestruct ? data?.records : null}
+        recordIndex={recordIndex}
+        onRecordIndex={onSelectRecord}
       />
 
       <main className="main">
         <header className="main-header">
           <h1>Hearing Aid Acoustic Analysis</h1>
           <p>
-            Frame-level features and outlier detection for WAV recordings — clicks,
-            dropouts, and processing artifacts.
+            {isThestruct
+              ? "ILD/ITD spatial maps from OSF thestruct MAT files — hearing-aid, room, and run conditions."
+              : "Frame-level features and outlier detection for WAV recordings — clicks, dropouts, and processing artifacts."}
           </p>
         </header>
 
         {!data && !loading && (
           <div className="welcome">
-            <p>Upload a <code>.wav</code> file in the sidebar to start.</p>
+            <p>
+              Upload a <code>.mat</code> thestruct file or <code>.wav</code> recording in the
+              sidebar.
+            </p>
             <ul>
-              <li>Canvas rendering — no heavy chart libraries</li>
-              <li>Downsampled payloads for fast transfer</li>
-              <li>Isolation Forest, Z-score, or IQR detectors</li>
+              <li>
+                <strong>MAT</strong> — 63 ILD/ITD maps per subject (Occ/Open/Unaid × rooms × runs)
+              </li>
+              <li>
+                <strong>WAV</strong> — frame-level acoustic features and temporal outliers
+              </li>
+              <li>Canvas heatmaps and charts — lightweight, fast rendering</li>
             </ul>
           </div>
         )}
 
         {(data || loading) && (
           <>
-            <Metrics summary={data?.summary} />
+            <Metrics summary={data?.summary} dataType={data?.dataType} />
 
             <nav className="tabs" role="tablist">
               {["overview", "features", "export"].map((id) => (
@@ -130,13 +197,19 @@ export default function App() {
                   aria-selected={tab === id}
                   className={tab === id ? "active" : ""}
                   onClick={() => setTab(id)}
+                  disabled={id === "features" && isThestruct}
+                  title={id === "features" && isThestruct ? "Not available for MAT files" : undefined}
                 >
                   {id.charAt(0).toUpperCase() + id.slice(1)}
                 </button>
               ))}
             </nav>
 
-            {tab === "overview" && data && (
+            {tab === "overview" && data && isThestruct && (
+              <ThestructView data={data} onSelectRecord={onSelectRecord} />
+            )}
+
+            {tab === "overview" && data && !isThestruct && (
               <div className="tab-panel">
                 <WaveformChart waveform={data.waveform} regions={data.regions} />
                 <div className="chart-row">
@@ -153,7 +226,7 @@ export default function App() {
               </div>
             )}
 
-            {tab === "features" && data && (
+            {tab === "features" && data && !isThestruct && (
               <div className="tab-panel">
                 <FeatureCharts features={data.features} anomaly={data.anomaly} />
               </div>
@@ -162,11 +235,11 @@ export default function App() {
             {tab === "export" && data && (
               <div className="tab-panel export-panel">
                 <button type="button" className="btn" onClick={exportFeatures}>
-                  Download frame features (CSV)
+                  {isThestruct ? "Download selected record (CSV)" : "Download frame features (CSV)"}
                 </button>
-                {data.regions?.length > 0 && (
+                {(isThestruct ? data.records?.some((r) => r.isOutlier) : data.regions?.length > 0) && (
                   <button type="button" className="btn secondary" onClick={exportRegions}>
-                    Download outlier regions (CSV)
+                    {isThestruct ? "Download record outlier summary (CSV)" : "Download outlier regions (CSV)"}
                   </button>
                 )}
               </div>

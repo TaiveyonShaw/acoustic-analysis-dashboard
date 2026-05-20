@@ -1,7 +1,7 @@
 /** Same-origin on Render; override with VITE_API_URL for split deploy (e.g. Netlify UI). */
 const API = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
-export async function analyzeWav(file, settings, signal) {
+export async function analyzeFile(file, settings, signal, { recordIndex = 0 } = {}) {
   const form = new FormData();
   form.append("file", file);
   form.append("frame_length", String(settings.frameLength));
@@ -10,6 +10,7 @@ export async function analyzeWav(file, settings, signal) {
   form.append("contamination", String(settings.contamination));
   form.append("z_threshold", String(settings.zThreshold));
   form.append("iqr_multiplier", String(settings.iqrMultiplier));
+  form.append("record_index", String(recordIndex));
 
   const res = await fetch(`${API}/analyze`, {
     method: "POST",
@@ -23,6 +24,9 @@ export async function analyzeWav(file, settings, signal) {
   }
   return res.json();
 }
+
+/** @deprecated use analyzeFile */
+export const analyzeWav = analyzeFile;
 
 export function rowsToCsv(rows) {
   if (!rows?.length) return "";

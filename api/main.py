@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from acoustic_analysis.analyzer import AcousticAnalyzer
 from acoustic_analysis.outliers import OutlierConfig, OutlierMethod
 from acoustic_analysis.serialize import result_to_payload
+from acoustic_analysis.thestruct import analyze_thestruct, load_thestruct_bytes
+from acoustic_analysis.thestruct_serialize import thestruct_to_payload
 
 app = FastAPI(title="Acoustic Analysis API", version="0.1.0")
 
@@ -34,6 +36,20 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+def _outlier_config(
+    method: str,
+    contamination: float,
+    z_threshold: float,
+    iqr_multiplier: float,
+) -> OutlierConfig:
+    return OutlierConfig(
+        method=OutlierMethod(method),
+        contamination=contamination,
+        z_threshold=z_threshold,
+        iqr_multiplier=iqr_multiplier,
+    )
+
+
 @app.post("/api/analyze")
 async def analyze(
     file: UploadFile = File(...),
@@ -43,21 +59,26 @@ async def analyze(
     contamination: float = Form(0.05),
     z_threshold: float = Form(3.0),
     iqr_multiplier: float = Form(1.5),
+    record_index: int = Form(0),
 ) -> dict:
     data = await file.read()
-    config = OutlierConfig(
-        method=OutlierMethod(method),
-        contamination=contamination,
-        z_threshold=z_threshold,
-        iqr_multiplier=iqr_multiplier,
-    )
+    filename = (file.filename or "upload").lower()
+    config = _outlier_config(method, contamination, z_threshold, iqr_multiplier)
+
+    if filename.endswith(".mat"):
+        thestruct = load_thestruct_bytes(data, file_name=file.filename or "upload.mat")
+        analysis = analyze_thestruct(thestruct, outlier_config=config, record_index=record_index)
+        return thestruct_to_payload(analysis, record_index=record_index)
+
     analyzer = AcousticAnalyzer(
         frame_length=frame_length,
         hop_length=hop_length,
         outlier_config=config,
     )
     result = analyzer.analyze_bytes(data, file_name=file.filename or "upload.wav")
-    return result_to_payload(result)
+    payload = result_to_payload(result)
+    payload["dataType"] = "wav"
+    return payload
 
 
 _dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"

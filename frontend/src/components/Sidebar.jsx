@@ -10,6 +10,10 @@ export default function Sidebar({
   onFile,
   loading,
   error,
+  dataType,
+  thestructRecords,
+  recordIndex,
+  onRecordIndex,
 }) {
   const set = (key, value) => onChange({ ...settings, [key]: value });
 
@@ -24,10 +28,10 @@ export default function Sidebar({
       </div>
 
       <label className="field">
-        <span>WAV file</span>
+        <span>Audio or MAT file</span>
         <input
           type="file"
-          accept=".wav,audio/wav"
+          accept=".wav,audio/wav,.mat,application/x-matlab-data"
           disabled={loading}
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -36,7 +40,25 @@ export default function Sidebar({
         />
       </label>
 
-      <fieldset className="fieldset" disabled={loading}>
+      {dataType === "thestruct" && thestructRecords?.length > 0 && (
+        <label className="field">
+          <span>Record (aid · room · run)</span>
+          <select
+            value={recordIndex}
+            disabled={loading}
+            onChange={(e) => onRecordIndex?.(Number(e.target.value))}
+          >
+            {thestructRecords.map((r) => (
+              <option key={r.index} value={r.index}>
+                {r.label}
+                {r.isOutlier ? " ⚠" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <fieldset className="fieldset" disabled={loading || dataType === "thestruct"}>
         <legend>Analysis</legend>
         <label className="field">
           <span>Frame length</span>

@@ -321,3 +321,34 @@ th {
 .btn:hover {
   filter: brightness(1.08);
 }
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tabs button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.thestruct-records tbody tr {
+  cursor: pointer;
+}
+
+.thestruct-records tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.thestruct-records tr.selected-row {
+  background: rgba(91, 155, 213, 0.12);
+}
+
+.thestruct-records tr.outlier-row td:last-child {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.record-summary p {
+  margin: 0.25rem 0;
+}

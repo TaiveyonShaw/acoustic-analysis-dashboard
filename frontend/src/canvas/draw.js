@@ -109,6 +109,50 @@ export function drawAxisLabels(ctx, width, height, xLabel, yLabel) {
   ctx.restore();
 }
 
+/** Draw matrix heatmap (rows = y-axis, cols = x-axis). Optional bool mask overlays outliers. */
+export function drawHeatmap(ctx, rect, values2d, outlierMask) {
+  const nY = values2d.length;
+  const nX = values2d[0]?.length ?? 0;
+  if (!nY || !nX) return;
+
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let y = 0; y < nY; y++) {
+    for (let x = 0; x < nX; x++) {
+      const v = values2d[y][x];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  const span = hi - lo || 1;
+  const cellW = rect.w / nX;
+  const cellH = rect.h / nY;
+
+  for (let y = 0; y < nY; y++) {
+    for (let x = 0; x < nX; x++) {
+      const norm = (values2d[y][x] - lo) / span;
+      const [r, g, b] = viridis(norm);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      const px = rect.x0 + x * cellW;
+      const py = rect.y0 + rect.h - (y + 1) * cellH;
+      ctx.fillRect(px, py, cellW + 0.5, cellH + 0.5);
+    }
+  }
+
+  if (outlierMask?.length) {
+    ctx.strokeStyle = "rgba(232, 93, 86, 0.95)";
+    ctx.lineWidth = 1.5;
+    for (let y = 0; y < nY; y++) {
+      for (let x = 0; x < nX; x++) {
+        if (!outlierMask[y]?.[x]) continue;
+        const px = rect.x0 + x * cellW;
+        const py = rect.y0 + rect.h - (y + 1) * cellH;
+        ctx.strokeRect(px + 0.5, py + 0.5, cellW - 1, cellH - 1);
+      }
+    }
+  }
+}
+
 /** Draw decimated spectrogram (rows = freq, cols = time). */
 export function drawSpectrogram(ctx, rect, db2d, tMin, tMax, fMin, fMax) {
   const nF = db2d.length;
