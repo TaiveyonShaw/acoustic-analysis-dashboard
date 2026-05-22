@@ -4,8 +4,6 @@ const API = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 export async function analyzeFile(file, settings, signal, { recordIndex = 0 } = {}) {
   const form = new FormData();
   form.append("file", file);
-  form.append("frame_length", String(settings.frameLength));
-  form.append("hop_length", String(settings.hopLength));
   form.append("method", settings.method);
   form.append("contamination", String(settings.contamination));
   form.append("z_threshold", String(settings.zThreshold));

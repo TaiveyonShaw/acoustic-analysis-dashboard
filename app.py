@@ -33,8 +33,6 @@ st.caption(
 def run_analysis(
     file_bytes: bytes,
     file_name: str,
-    frame_length: int,
-    hop_length: int,
     method: str,
     contamination: float,
     z_threshold: float,
@@ -46,11 +44,7 @@ def run_analysis(
         z_threshold=z_threshold,
         iqr_multiplier=iqr_multiplier,
     )
-    analyzer = AcousticAnalyzer(
-        frame_length=frame_length,
-        hop_length=hop_length,
-        outlier_config=config,
-    )
+    analyzer = AcousticAnalyzer(outlier_config=config)
     result = analyzer.analyze_bytes(file_bytes, file_name=file_name)
     return {
         "result": result,
@@ -69,9 +63,6 @@ def run_analysis(
 with st.sidebar:
     st.header("Settings")
     uploaded = st.file_uploader("WAV file", type=["wav"], help="Mono or stereo hearing-aid recording")
-    st.subheader("Analysis")
-    frame_length = st.select_slider("Frame length (samples)", options=[1024, 2048, 4096], value=2048)
-    hop_length = st.select_slider("Hop length (samples)", options=[256, 512, 1024], value=512)
     st.subheader("Outlier detection")
     method = st.selectbox(
         "Method",
@@ -114,8 +105,6 @@ file_bytes = uploaded.read()
 analysis = run_analysis(
     file_bytes,
     uploaded.name,
-    frame_length,
-    hop_length,
     method,
     contamination,
     z_threshold,

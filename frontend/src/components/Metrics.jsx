@@ -6,10 +6,16 @@ export default function Metrics({ summary, dataType }) {
       ? [
           { label: "Subject records", value: String(summary.nRecords) },
           {
+            label: "Direction accuracy",
+            value:
+              summary.directionAccuracyPct != null
+                ? `${summary.directionAccuracyPct}%`
+                : "—",
+          },
+          {
             label: "Outlier records",
             value: `${summary.nOutliers} / ${summary.nRecords}`,
           },
-          { label: "Outlier %", value: `${summary.outlierPct}%` },
           { label: "Azimuths", value: String(summary.nAzimuths) },
           { label: "Freq bins", value: String(summary.nFreqs) },
         ]

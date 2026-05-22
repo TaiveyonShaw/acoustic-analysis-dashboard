@@ -53,8 +53,6 @@ def _outlier_config(
 @app.post("/api/analyze")
 async def analyze(
     file: UploadFile = File(...),
-    frame_length: int = Form(2048),
-    hop_length: int = Form(512),
     method: str = Form("isolation_forest"),
     contamination: float = Form(0.05),
     z_threshold: float = Form(3.0),
@@ -70,11 +68,7 @@ async def analyze(
         analysis = analyze_thestruct(thestruct, outlier_config=config, record_index=record_index)
         return thestruct_to_payload(analysis, record_index=record_index)
 
-    analyzer = AcousticAnalyzer(
-        frame_length=frame_length,
-        hop_length=hop_length,
-        outlier_config=config,
-    )
+    analyzer = AcousticAnalyzer(outlier_config=config)
     result = analyzer.analyze_bytes(data, file_name=file.filename or "upload.wav")
     payload = result_to_payload(result)
     payload["dataType"] = "wav"

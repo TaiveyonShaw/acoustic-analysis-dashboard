@@ -1,3 +1,5 @@
+import { MoonIcon, SunIcon } from "./ThemeIcon";
+
 const METHOD_LABELS = {
   isolation_forest: "Isolation Forest",
   z_score: "Z-score",
@@ -14,18 +16,24 @@ export default function Sidebar({
   thestructRecords,
   recordIndex,
   onRecordIndex,
+  onToggleTheme,
+  isLight,
 }) {
   const set = (key, value) => onChange({ ...settings, [key]: value });
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand-icon" aria-hidden>🎧</span>
-        <div>
-          <strong>Acoustic Analysis</strong>
-          <p>Hearing-aid outlier detection</p>
-        </div>
-      </div>
+      <h2 className="sidebar-title">Configurations</h2>
+
+      <button
+        type="button"
+        className="theme-toggle"
+        onClick={onToggleTheme}
+        aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
+      >
+        <span>{isLight ? "Dark mode" : "Light mode"}</span>
+        {isLight ? <MoonIcon /> : <SunIcon />}
+      </button>
 
       <label className="field">
         <span>Audio or MAT file</span>
@@ -57,32 +65,6 @@ export default function Sidebar({
           </select>
         </label>
       )}
-
-      <fieldset className="fieldset" disabled={loading || dataType === "thestruct"}>
-        <legend>Analysis</legend>
-        <label className="field">
-          <span>Frame length</span>
-          <select
-            value={settings.frameLength}
-            onChange={(e) => set("frameLength", Number(e.target.value))}
-          >
-            <option value={1024}>1024</option>
-            <option value={2048}>2048</option>
-            <option value={4096}>4096</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Hop length</span>
-          <select
-            value={settings.hopLength}
-            onChange={(e) => set("hopLength", Number(e.target.value))}
-          >
-            <option value={256}>256</option>
-            <option value={512}>512</option>
-            <option value={1024}>1024</option>
-          </select>
-        </label>
-      </fieldset>
 
       <fieldset className="fieldset" disabled={loading}>
         <legend>Outlier detection</legend>

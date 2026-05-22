@@ -8,10 +8,9 @@ import AnomalyChart from "./components/AnomalyChart";
 import FeatureCharts from "./components/FeatureCharts";
 import RegionsTable from "./components/RegionsTable";
 import ThestructView from "./components/ThestructView";
+import { useTheme } from "./hooks/useTheme";
 
 const DEFAULT_SETTINGS = {
-  frameLength: 2048,
-  hopLength: 512,
   method: "isolation_forest",
   contamination: 0.05,
   zThreshold: 3,
@@ -19,6 +18,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function App() {
+  const { theme, toggle: toggleTheme, isLight } = useTheme();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -154,6 +154,8 @@ export default function App() {
         thestructRecords={isThestruct ? data?.records : null}
         recordIndex={recordIndex}
         onRecordIndex={onSelectRecord}
+        onToggleTheme={toggleTheme}
+        isLight={isLight}
       />
 
       <main className="main">
@@ -206,18 +208,19 @@ export default function App() {
             </nav>
 
             {tab === "overview" && data && isThestruct && (
-              <ThestructView data={data} onSelectRecord={onSelectRecord} />
+              <ThestructView data={data} onSelectRecord={onSelectRecord} theme={theme} />
             )}
 
             {tab === "overview" && data && !isThestruct && (
               <div className="tab-panel">
-                <WaveformChart waveform={data.waveform} regions={data.regions} />
+                <WaveformChart waveform={data.waveform} regions={data.regions} theme={theme} />
                 <div className="chart-row">
                   <SpectrogramChart
                     spectrogram={data.spectrogram}
                     regions={data.regions}
+                    theme={theme}
                   />
-                  <AnomalyChart anomaly={data.anomaly} />
+                  <AnomalyChart anomaly={data.anomaly} theme={theme} />
                 </div>
                 <section className="chart-card">
                   <h3>Outlier regions</h3>
@@ -228,7 +231,7 @@ export default function App() {
 
             {tab === "features" && data && !isThestruct && (
               <div className="tab-panel">
-                <FeatureCharts features={data.features} anomaly={data.anomaly} />
+                <FeatureCharts features={data.features} anomaly={data.anomaly} theme={theme} />
               </div>
             )}
 

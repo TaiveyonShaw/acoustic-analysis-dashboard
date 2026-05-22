@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from acoustic_analysis.azimuth import remap_azimuth_list
+from acoustic_analysis.direction_accuracy import direction_accuracy_payload
 from acoustic_analysis.thestruct import ThestructAnalysis, ThestructRecord
 
 MATRIX_FIELDS = ("rawILD", "normILD", "rawITD", "normITD")
@@ -44,6 +46,8 @@ def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> d
         if name in analysis.cell_outliers
     }
 
+    direction_accuracy = direction_accuracy_payload(thestruct, selected)
+
     return {
         "dataType": "thestruct",
         "fileName": thestruct.file_name,
@@ -57,12 +61,14 @@ def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> d
             "nAzimuths": len(selected.azimuths),
             "nFreqs": len(selected.freqs),
             "selectedIndex": record_index,
+            "directionAccuracyPct": direction_accuracy.get("overallAccuracyPct"),
         },
         "records": records_meta,
         "selected": _record_payload(selected, cell_masks, cell_scores),
         "matrices": {
             name: _round_matrix(getattr(selected, name).tolist()) for name in MATRIX_FIELDS
         },
+        "directionAccuracy": direction_accuracy,
     }
 
 
@@ -79,7 +85,7 @@ def _record_payload(
         "cond": record.cond,
         "run": record.run,
         "label": record.label,
-        "azimuths": record.azimuths.astype(int).tolist(),
+        "azimuths": remap_azimuth_list(record.azimuths),
         "freqs": _round_list(record.freqs.tolist()),
         "cellOutliers": {
             "masks": cell_masks,

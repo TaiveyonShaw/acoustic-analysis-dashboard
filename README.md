@@ -96,7 +96,6 @@ streamlit run app.py
 |-------|---------|
 | `file` | `.wav` recording or OSF `.mat` thestruct file |
 | `record_index` | For MAT files: which of the 63 aid/room/run records to visualize (0–62) |
-| `frame_length`, `hop_length` | WAV analysis only |
 | `method`, `contamination`, `z_threshold`, `iqr_multiplier` | Outlier detector settings |
 
 ### MAT (thestruct) format
