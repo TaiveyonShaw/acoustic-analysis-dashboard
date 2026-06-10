@@ -107,9 +107,6 @@ export default function App() {
         onOsfFile={onOsfFile}
         loading={loading}
         error={error}
-        thestructRecords={data?.records}
-        recordIndex={recordIndex}
-        onRecordIndex={onSelectRecord}
         onToggleTheme={toggleTheme}
         isLight={isLight}
       />
@@ -141,7 +138,16 @@ export default function App() {
         {(data || loading) && (
           <>
             <Metrics summary={data?.summary} />
-            {data && <ThestructView data={data} theme={theme} />}
+            {data && (
+              <ThestructView
+                data={data}
+                theme={theme}
+                records={data.records}
+                recordIndex={recordIndex}
+                onRecordIndex={onSelectRecord}
+                loading={loading}
+              />
+            )}
           </>
         )}
       </main>
