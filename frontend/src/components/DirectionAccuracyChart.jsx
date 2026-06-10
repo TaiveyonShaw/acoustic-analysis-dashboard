@@ -15,6 +15,8 @@ import {
 } from "../utils/chartLegend";
 import ChartLegend from "./ChartLegend";
 import AzimuthValuesPanel from "./AzimuthValuesPanel";
+import SwapAxesButton from "./SwapAxesButton";
+import { nearestFreqIndex } from "../utils/freqAxisScale";
 
 const VALUE_MATRICES = (matrices) => ({
   normILD: matrices?.normILD,
@@ -28,16 +30,17 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
   const profileRef = useRef(null);
   const hasReference = directionAccuracy?.hasReference;
   const [metric, setMetric] = useState("normILD");
-  const [freqIdx, setFreqIdx] = useState(() =>
-    Math.floor((selected?.freqs?.length ?? 28) / 2)
-  );
+  const [freqIdx, setFreqIdx] = useState(() => nearestFreqIndex(selected?.freqs));
   const metricMeta = getMetricMeta(metric);
   const [legendVisible, setLegendVisible] = useState(() =>
     defaultLegendVisibility({ includeReference: true })
   );
+  const [swapAzimuthAxes, setSwapAzimuthAxes] = useState(false);
+  const [swapFreqAxes, setSwapFreqAxes] = useState(false);
+  const [freqAxisScale, setFreqAxisScale] = useState("mel");
   useEffect(() => {
-    setFreqIdx(Math.floor((selected?.freqs?.length ?? 28) / 2));
-  }, [selected?.index, selected?.freqs?.length]);
+    setFreqIdx(nearestFreqIndex(selected?.freqs));
+  }, [selected?.index, selected?.freqs]);
 
   useEffect(() => {
     setLegendVisible(defaultLegendVisibility({ includeReference: hasReference }));
@@ -69,8 +72,9 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
       reference: legendVisible[LEGEND_IDS.reference] ? reference : null,
       showPrimary: legendVisible[LEGEND_IDS.selected],
       comparisonLayout: true,
+      swapAxes: swapAzimuthAxes,
     });
-  }, [directionAccuracy, matrices, selected, freqIdx, legendVisible, hasReference, metric, metricMeta.yLabel]);
+  }, [directionAccuracy, matrices, selected, freqIdx, legendVisible, hasReference, metric, metricMeta.yLabel, swapAzimuthAxes]);
 
   useChartRedraw(polarRef, drawPolar, [drawPolar, theme]);
   useChartRedraw(profileRef, drawProfile, [drawProfile, theme]);
@@ -104,6 +108,11 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
       legendVisible={hasReference ? legendVisible : undefined}
       onLegendToggle={hasReference ? toggleLegend : undefined}
       hideLegend={hasReference}
+      swapAxes={swapFreqAxes}
+      onSwapAxesChange={setSwapFreqAxes}
+      freqAxisScale={freqAxisScale}
+      onFreqAxisScaleChange={setFreqAxisScale}
+      showFreqPlotControls
     />
   );
 
@@ -113,12 +122,6 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
 
       {hasReference ? (
         <>
-          <p className="muted">
-            Compares <strong>{selected?.aid}</strong> to unaided reference (
-            {directionAccuracy.referenceLabel}). Higher % = spatial cues closer to baseline
-            at that source direction.
-          </p>
-
           <div className="accuracy-summary">
             <div className="metric-inline">
               <span className="metric-label">Overall</span>
@@ -137,20 +140,22 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
           <div className="direction-charts-stack">
             <div className="direction-shared-controls direction-chart-header direction-chart-header--title-inline">
               <h4 className="direction-shared-heading">Charts</h4>
-              <label className="field inline-field direction-metric-select">
-                <span>Metric</span>
-                <select
-                  value={metric}
-                  onChange={(e) => setMetric(e.target.value)}
-                  aria-label="Metric for profile and values charts"
-                >
-                  {VALUE_METRICS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="direction-chart-header-controls">
+                <label className="field inline-field direction-metric-select">
+                  <span>Metric</span>
+                  <select
+                    value={metric}
+                    onChange={(e) => setMetric(e.target.value)}
+                    aria-label="Metric for profile and values charts"
+                  >
+                    {VALUE_METRICS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
             <div
               className="direction-charts-pair"
@@ -158,7 +163,11 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
             >
               <div className="comparison-chart-column profile-wrap">
                 <div className="direction-chart-header direction-chart-header--title-inline">
-                  <h4>{metricMeta.label} vs azimuth</h4>
+                  <h4>
+                    {swapAzimuthAxes
+                      ? `${metricMeta.yLabel} vs azimuth`
+                      : `${metricMeta.label} vs azimuth`}
+                  </h4>
                   <div className="direction-chart-header-controls">
                     <label className="field inline-field direction-freq-select">
                       <span>Frequency</span>
@@ -174,6 +183,12 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
                         ))}
                       </select>
                     </label>
+                    <SwapAxesButton
+                      active={swapAzimuthAxes}
+                      onClick={() => setSwapAzimuthAxes((v) => !v)}
+                      title="Swap azimuth and metric axes"
+                      ariaLabel="Swap azimuth and metric axes"
+                    />
                   </div>
                 </div>
                 <div className="chart-canvas-wrap comparison-chart-plot">
@@ -200,8 +215,6 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
                 <tr>
                   <th>Azimuth</th>
                   <th>Accuracy</th>
-                  <th>ILD err</th>
-                  <th>ITD err</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,8 +222,6 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
                   <tr key={d.azimuth} className={d.accuracyPct < 50 ? "low-accuracy" : ""}>
                     <td>{d.azimuth}°</td>
                     <td>{d.accuracyPct}%</td>
-                    <td>{d.ildError}</td>
-                    <td>{d.itdError}</td>
                   </tr>
                 ))}
               </tbody>

@@ -6,18 +6,16 @@ import numpy as np
 
 from acoustic_analysis.azimuth import remap_azimuth_list
 from acoustic_analysis.direction_accuracy import direction_accuracy_payload
-from acoustic_analysis.thestruct import ThestructAnalysis, ThestructRecord
+from acoustic_analysis.thestruct import ThestructFile, ThestructRecord
 
 MATRIX_FIELDS = ("rawILD", "normILD", "rawITD", "normITD")
 
 
-def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> dict:
-    thestruct = analysis.thestruct
+def thestruct_to_payload(thestruct: ThestructFile, *, record_index: int) -> dict:
     record_index = int(np.clip(record_index, 0, len(thestruct.records) - 1))
     selected = thestruct.records[record_index]
 
     n_records = len(thestruct.records)
-    n_outliers = int(analysis.record_outliers.mask.sum())
 
     records_meta = []
     for i, rec in enumerate(thestruct.records):
@@ -30,21 +28,8 @@ def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> d
                 "cond": rec.cond,
                 "run": rec.run,
                 "label": rec.label,
-                "isOutlier": bool(analysis.record_outliers.mask[i]),
-                "anomalyScore": round(float(analysis.record_outliers.scores[i]), 5),
             }
         )
-
-    cell_masks = {
-        name: analysis.cell_outliers[name].mask.reshape(selected.normILD.shape).tolist()
-        for name in ("normILD", "normITD")
-        if name in analysis.cell_outliers
-    }
-    cell_scores = {
-        name: _round_matrix(analysis.cell_outliers[name].scores.reshape(selected.normILD.shape).tolist())
-        for name in ("normILD", "normITD")
-        if name in analysis.cell_outliers
-    }
 
     direction_accuracy = direction_accuracy_payload(thestruct, selected)
 
@@ -55,16 +40,13 @@ def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> d
         "subject": thestruct.subject,
         "summary": {
             "nRecords": n_records,
-            "nOutliers": n_outliers,
-            "outlierPct": round(100 * n_outliers / max(n_records, 1), 2),
-            "method": analysis.record_outliers.method,
             "nAzimuths": len(selected.azimuths),
             "nFreqs": len(selected.freqs),
             "selectedIndex": record_index,
             "directionAccuracyPct": direction_accuracy.get("overallAccuracyPct"),
         },
         "records": records_meta,
-        "selected": _record_payload(selected, cell_masks, cell_scores),
+        "selected": _record_payload(selected),
         "matrices": {
             name: _round_matrix(getattr(selected, name).tolist()) for name in MATRIX_FIELDS
         },
@@ -72,11 +54,7 @@ def thestruct_to_payload(analysis: ThestructAnalysis, *, record_index: int) -> d
     }
 
 
-def _record_payload(
-    record: ThestructRecord,
-    cell_masks: dict[str, list],
-    cell_scores: dict[str, list],
-) -> dict:
+def _record_payload(record: ThestructRecord) -> dict:
     return {
         "index": record.index,
         "subject": record.subject,
@@ -87,10 +65,6 @@ def _record_payload(
         "label": record.label,
         "azimuths": remap_azimuth_list(record.azimuths),
         "freqs": _round_list(record.freqs.tolist()),
-        "cellOutliers": {
-            "masks": cell_masks,
-            "scores": cell_scores,
-        },
     }
 
 

@@ -1,135 +1,127 @@
+import { useCallback, useState } from "react";
 import { MoonIcon, SunIcon } from "./ThemeIcon";
+import OsfBrowser from "./OsfBrowser";
 
-const METHOD_LABELS = {
-  isolation_forest: "Isolation Forest",
-  z_score: "Z-score",
-  iqr: "IQR",
-};
+function ChevronIcon({ direction = "left" }) {
+  const path = direction === "left" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6";
+  return (
+    <svg
+      className="sidebar-toggle-icon"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+function readCollapsedPreference() {
+  try {
+    return localStorage.getItem("sidebarCollapsed") === "1";
+  } catch {
+    return false;
+  }
+}
 
 export default function Sidebar({
-  settings,
-  onChange,
   onFile,
+  onOsfFile,
   loading,
   error,
-  dataType,
   thestructRecords,
   recordIndex,
   onRecordIndex,
   onToggleTheme,
   isLight,
 }) {
-  const set = (key, value) => onChange({ ...settings, [key]: value });
+  const [collapsed, setCollapsed] = useState(readCollapsedPreference);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("sidebarCollapsed", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   return (
-    <aside className="sidebar">
-      <h2 className="sidebar-title">Configurations</h2>
+    <aside
+      className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`}
+      aria-label="Configuration sidebar"
+    >
+      <div className="sidebar-header">
+        {!collapsed && <h2 className="sidebar-title">Configurations</h2>}
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <ChevronIcon direction={collapsed ? "right" : "left"} />
+        </button>
+      </div>
 
-      <button
-        type="button"
-        className="theme-toggle"
-        onClick={onToggleTheme}
-        aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
-      >
-        <span>{isLight ? "Dark mode" : "Light mode"}</span>
-        {isLight ? <MoonIcon /> : <SunIcon />}
-      </button>
+      <div className="sidebar-content" hidden={collapsed}>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={onToggleTheme}
+          aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
+        >
+          <span>{isLight ? "Dark mode" : "Light mode"}</span>
+          {isLight ? <MoonIcon /> : <SunIcon />}
+        </button>
 
-      <label className="field">
-        <span>Audio or MAT file</span>
-        <input
-          type="file"
-          accept=".wav,audio/wav,.mat,application/x-matlab-data"
-          disabled={loading}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onFile(f);
-          }}
-        />
-      </label>
+        <OsfBrowser onSelect={onOsfFile} loading={loading} disabled={loading} />
 
-      {dataType === "thestruct" && thestructRecords?.length > 0 && (
+        <p className="source-divider">or upload locally</p>
+
         <label className="field">
-          <span>Record (aid · room · run)</span>
-          <select
-            value={recordIndex}
+          <span>MAT file</span>
+          <input
+            type="file"
+            accept=".mat,application/x-matlab-data"
             disabled={loading}
-            onChange={(e) => onRecordIndex?.(Number(e.target.value))}
-          >
-            {thestructRecords.map((r) => (
-              <option key={r.index} value={r.index}>
-                {r.label}
-                {r.isOutlier ? " ⚠" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-
-      <fieldset className="fieldset" disabled={loading}>
-        <legend>Outlier detection</legend>
-        <label className="field">
-          <span>Method</span>
-          <select
-            value={settings.method}
-            onChange={(e) => set("method", e.target.value)}
-          >
-            {Object.entries(METHOD_LABELS).map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+            }}
+          />
         </label>
 
-        {settings.method === "isolation_forest" && (
+        {thestructRecords?.length > 0 && (
           <label className="field">
-            <span>Outlier fraction</span>
-            <input
-              type="range"
-              min={0.01}
-              max={0.25}
-              step={0.01}
-              value={settings.contamination}
-              onChange={(e) => set("contamination", Number(e.target.value))}
-            />
-            <output>{settings.contamination.toFixed(2)}</output>
+            <span>Record (aid · room · run)</span>
+            <select
+              value={recordIndex}
+              disabled={loading}
+              onChange={(e) => onRecordIndex?.(Number(e.target.value))}
+            >
+              {thestructRecords.map((r) => (
+                <option key={r.index} value={r.index}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
           </label>
         )}
 
-        {settings.method === "z_score" && (
-          <label className="field">
-            <span>Z threshold</span>
-            <input
-              type="range"
-              min={2}
-              max={5}
-              step={0.1}
-              value={settings.zThreshold}
-              onChange={(e) => set("zThreshold", Number(e.target.value))}
-            />
-            <output>{settings.zThreshold.toFixed(1)}</output>
-          </label>
-        )}
-
-        {settings.method === "iqr" && (
-          <label className="field">
-            <span>IQR multiplier</span>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.1}
-              value={settings.iqrMultiplier}
-              onChange={(e) => set("iqrMultiplier", Number(e.target.value))}
-            />
-            <output>{settings.iqrMultiplier.toFixed(1)}</output>
-          </label>
-        )}
-      </fieldset>
-
-      {loading && <p className="status loading">Analyzing…</p>}
-      {error && <p className="status error">{error}</p>}
+        {loading && <p className="status loading">Analyzing…</p>}
+        {error && <p className="status error">{error}</p>}
+      </div>
     </aside>
   );
 }

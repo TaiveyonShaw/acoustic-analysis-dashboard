@@ -8,8 +8,6 @@ from pathlib import Path
 import numpy as np
 import scipy.io
 
-from acoustic_analysis.outliers import OutlierConfig, OutlierResult, detect_outliers
-
 FIELD_NAMES = (
     "subject",
     "aid",
@@ -55,13 +53,6 @@ class ThestructFile:
     records: list[ThestructRecord]
 
 
-@dataclass
-class ThestructAnalysis:
-    thestruct: ThestructFile
-    record_outliers: OutlierResult
-    cell_outliers: dict[str, OutlierResult]
-
-
 def load_thestruct_bytes(data: bytes, file_name: str = "upload.mat") -> ThestructFile:
     import io
 
@@ -102,30 +93,6 @@ def load_thestruct_file(source: str | Path | object, *, file_name: str | None = 
         file_name=name,
         subject=subject,
         records=records,
-    )
-
-
-def analyze_thestruct(
-    thestruct: ThestructFile,
-    *,
-    outlier_config: OutlierConfig,
-    record_index: int = 0,
-) -> ThestructAnalysis:
-    record_features = np.array([_record_feature_vector(r) for r in thestruct.records], dtype=np.float64)
-    record_outliers = detect_outliers(record_features, outlier_config)
-
-    record_index = int(np.clip(record_index, 0, len(thestruct.records) - 1))
-    selected = thestruct.records[record_index]
-    cell_outliers: dict[str, OutlierResult] = {}
-    for field in ("normILD", "normITD"):
-        matrix = getattr(selected, field)
-        features = np.column_stack([matrix.ravel(), getattr(selected, "rawILD" if field == "normILD" else "rawITD").ravel()])
-        cell_outliers[field] = detect_outliers(features, outlier_config)
-
-    return ThestructAnalysis(
-        thestruct=thestruct,
-        record_outliers=record_outliers,
-        cell_outliers=cell_outliers,
     )
 
 
@@ -174,18 +141,3 @@ def _parse_record(index: int, item: object) -> ThestructRecord:
         freqs=freqs,
         **matrices,
     )
-
-
-def _record_feature_vector(record: ThestructRecord) -> np.ndarray:
-    feats: list[float] = []
-    for name in MATRIX_FIELDS:
-        matrix = getattr(record, name)
-        feats.extend(
-            [
-                float(np.mean(matrix)),
-                float(np.std(matrix)),
-                float(np.min(matrix)),
-                float(np.max(matrix)),
-            ]
-        )
-    return np.array(feats, dtype=np.float64)

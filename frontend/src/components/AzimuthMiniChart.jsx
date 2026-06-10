@@ -19,6 +19,7 @@ export default function AzimuthMiniChart({
   showHeading = true,
   detailed = false,
   comparisonLayout = false,
+  swapAxes = false,
   freqAxisScale = "mel",
   canvasHeight = 160,
   theme,
@@ -42,6 +43,7 @@ export default function AzimuthMiniChart({
       overlay: overlayValues,
       detailed: comparisonLayout ? true : detailed,
       comparisonLayout,
+      swapAxes,
       freqAxisScale,
       showPrimary: visibility.primary !== false,
       showReference: visibility.reference !== false,
@@ -57,6 +59,7 @@ export default function AzimuthMiniChart({
     showAxisLabels,
     detailed,
     comparisonLayout,
+    swapAxes,
     freqAxisScale,
     canvasHeight,
   ]);

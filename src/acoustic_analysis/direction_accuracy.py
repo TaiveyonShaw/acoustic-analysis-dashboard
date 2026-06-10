@@ -103,9 +103,6 @@ def compute_direction_accuracy(
             {
                 "azimuth": remap_azimuth(int(selected.azimuths[i])),
                 "accuracyPct": accuracy_pct,
-                "ildError": round(ild_rms, 4),
-                "itdError": round(itd_rms, 4),
-                "combinedError": round(float(combined), 4),
             }
         )
 
@@ -118,10 +115,6 @@ def compute_direction_accuracy(
         "referenceLabel": reference.label,
         "overallAccuracyPct": overall,
         "perDirection": per_direction,
-        "errorMatrices": {
-            "normILD": _round_matrix(ild_err.tolist()),
-            "normITD": _round_matrix(itd_err.tolist()),
-        },
         "referenceMatrices": {
             field: _round_matrix(ref[field].tolist()) for field in MATRIX_FIELDS
         },
@@ -146,7 +139,6 @@ def direction_accuracy_payload(
             "overallAccuracyPct": None,
             "perDirection": [],
             "reason": reason,
-            "errorMatrices": None,
             "referenceMatrices": None,
         }
     return compute_direction_accuracy(selected, reference)

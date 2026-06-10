@@ -1,5 +1,6 @@
 /** Fast canvas helpers — no chart libraries. */
 
+import { freqAxisTitle } from "../utils/freqAxisScale";
 import { getChartColors } from "./themeColors";
 
 export function setupCanvas(canvas, heightCss = 220) {
@@ -100,15 +101,15 @@ function formatMetricValue(v) {
 /** Shared line/marker styling for selected vs unaided comparison charts. */
 const COMPARISON_SERIES_STYLE = {
   selected: {
-    lineWidth: 1.75,
+    lineWidth: 1.5,
     dashed: false,
-    pointRadius: 3.5,
+    pointRadius: 4,
     pointHollow: false,
   },
   reference: {
-    lineWidth: 2,
-    dashed: true,
-    pointRadius: 3.5,
+    lineWidth: 1.5,
+    dashed: false,
+    pointRadius: 4,
     pointHollow: true,
   },
 };
@@ -129,6 +130,18 @@ function hzToMel(hz) {
 
 function melToHz(mel) {
   return 700 * (10 ** (mel / 2595) - 1);
+}
+
+/** Log10 X by frequency in Hz. */
+function freqLogX(rect, hz, fMin, fMax, padRatio = 0) {
+  const lMin = Math.log10(fMin);
+  const lMax = Math.log10(fMax);
+  const l = Math.log10(hz);
+  const span = lMax - lMin || 1;
+  const lo = lMin - padRatio * span;
+  const hi = lMax + padRatio * span;
+  const s = hi - lo || 1;
+  return rect.x0 + ((l - lo) / s) * rect.w;
 }
 
 /** Linear X by frequency in Hz. */
@@ -171,18 +184,90 @@ function pickMelHzTicks(fMin, fMax, tickCount) {
 
 function freqScaleX(rect, hz, fMin, fMax, padRatio, scale) {
   if (scale === "linear") return freqHzX(rect, hz, fMin, fMax, padRatio);
+  if (scale === "log") return freqLogX(rect, hz, fMin, fMax, padRatio);
   return freqMelX(rect, hz, fMin, fMax, padRatio);
 }
 
 function pickFreqScaleTicks(fMin, fMax, tickCount, scale) {
   if (scale === "linear") return pickLinearHzTicks(fMin, fMax, tickCount);
+  if (scale === "log") return pickLogHzTicks(fMin, fMax, tickCount);
   return pickMelHzTicks(fMin, fMax, tickCount);
+}
+
+function pickLogHzTicks(fMin, fMax, tickCount) {
+  if (!Number.isFinite(fMin) || !Number.isFinite(fMax) || fMin <= 0 || fMax <= 0) return [];
+  const lMin = Math.log10(fMin);
+  const lMax = Math.log10(fMax);
+  if (lMin === lMax) return [fMin];
+  const n = Math.max(2, tickCount);
+  return Array.from({ length: n }, (_, i) => 10 ** (lMin + (i * (lMax - lMin)) / (n - 1)));
 }
 
 /** Metric value on Y: lo at bottom, hi at top of plot area. */
 function metricValueY(rect, value, vLo, vHi) {
   const vSpan = vHi - vLo || 1;
   return rect.y0 + rect.h - ((value - vLo) / vSpan) * rect.h;
+}
+
+/** Metric value on X: lo at left, hi at right. */
+function metricValueX(rect, value, vLo, vHi) {
+  const vSpan = vHi - vLo || 1;
+  return rect.x0 + ((value - vLo) / vSpan) * rect.w;
+}
+
+/** Frequency on Y (mel/linear): low at bottom, high at top. */
+function freqHzY(rect, hz, fMin, fMax, padRatio = 0) {
+  const span = fMax - fMin || 1;
+  const lo = fMin - padRatio * span;
+  const hi = fMax + padRatio * span;
+  const s = hi - lo || 1;
+  const t = (hz - lo) / s;
+  return rect.y0 + rect.h - t * rect.h;
+}
+
+function freqMelY(rect, hz, fMin, fMax, padRatio = 0) {
+  const mMin = hzToMel(fMin);
+  const mMax = hzToMel(fMax);
+  const mel = hzToMel(hz);
+  const span = mMax - mMin || 1;
+  const lo = mMin - padRatio * span;
+  const hi = mMax + padRatio * span;
+  const s = hi - lo || 1;
+  const t = (mel - lo) / s;
+  return rect.y0 + rect.h - t * rect.h;
+}
+
+function binIndexY(rect, index, nBins, padRatio = 0) {
+  const maxI = Math.max(1, nBins - 1);
+  const iLo = -padRatio * maxI;
+  const iHi = maxI + padRatio * maxI;
+  const span = iHi - iLo || 1;
+  const t = (index - iLo) / span;
+  return rect.y0 + rect.h - t * rect.h;
+}
+
+/** Frequency on Y (log/linear/mel): low at bottom, high at top. */
+function freqLogY(rect, hz, fMin, fMax, padRatio = 0) {
+  const lMin = Math.log10(fMin);
+  const lMax = Math.log10(fMax);
+  const l = Math.log10(hz);
+  const span = lMax - lMin || 1;
+  const lo = lMin - padRatio * span;
+  const hi = lMax + padRatio * span;
+  const s = hi - lo || 1;
+  const t = (l - lo) / s;
+  return rect.y0 + rect.h - t * rect.h;
+}
+
+function freqScaleY(rect, hz, fMin, fMax, padRatio, scale) {
+  if (scale === "linear") return freqHzY(rect, hz, fMin, fMax, padRatio);
+  if (scale === "log") return freqLogY(rect, hz, fMin, fMax, padRatio);
+  return freqMelY(rect, hz, fMin, fMax, padRatio);
+}
+
+function resolveHzScale(freqAxisScale) {
+  if (freqAxisScale === "bands") return "mel";
+  return freqAxisScale;
 }
 
 function valueRangeTight(lo, hi) {
@@ -323,6 +408,218 @@ function drawProfileScatterByFreq(
   }
 }
 
+function drawProfileLineSwapped(
+  ctx,
+  rect,
+  freqs,
+  values,
+  color,
+  vLo,
+  vHi,
+  fMin,
+  fMax,
+  fPad,
+  freqAxisScale,
+  style = COMPARISON_SERIES_STYLE.selected,
+) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = style.lineWidth ?? 1.25;
+  if (style.dashed) ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < freqs.length; i++) {
+    const v = values[i];
+    if (!Number.isFinite(v) || !Number.isFinite(freqs[i])) {
+      started = false;
+      continue;
+    }
+    const x = metricValueX(rect, v, vLo, vHi);
+    const y = freqScaleY(rect, freqs[i], fMin, fMax, fPad, resolveHzScale(freqAxisScale));
+    if (!started) {
+      ctx.moveTo(x, y);
+      started = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawProfileScatterSwapped(
+  ctx,
+  rect,
+  freqs,
+  values,
+  color,
+  vLo,
+  vHi,
+  fMin,
+  fMax,
+  fPad,
+  freqAxisScale,
+  style = COMPARISON_SERIES_STYLE.selected,
+) {
+  for (let i = 0; i < freqs.length; i++) {
+    const v = values[i];
+    if (!Number.isFinite(v) || !Number.isFinite(freqs[i])) continue;
+    const x = metricValueX(rect, v, vLo, vHi);
+    const y = freqScaleY(rect, freqs[i], fMin, fMax, fPad, resolveHzScale(freqAxisScale));
+    drawMarker(ctx, x, y, color, style);
+  }
+}
+
+function drawProfileLineByBinSwapped(
+  ctx,
+  rect,
+  values,
+  nBins,
+  color,
+  vLo,
+  vHi,
+  binPad,
+  style = COMPARISON_SERIES_STYLE.selected,
+) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = style.lineWidth ?? 1.25;
+  if (style.dashed) ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < nBins; i++) {
+    const v = values[i];
+    if (!Number.isFinite(v)) {
+      started = false;
+      continue;
+    }
+    const x = metricValueX(rect, v, vLo, vHi);
+    const y = binIndexY(rect, i, nBins, binPad);
+    if (!started) {
+      ctx.moveTo(x, y);
+      started = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawProfileScatterByBinSwapped(
+  ctx,
+  rect,
+  values,
+  nBins,
+  color,
+  vLo,
+  vHi,
+  binPad,
+  style = COMPARISON_SERIES_STYLE.selected,
+) {
+  for (let i = 0; i < nBins; i++) {
+    const v = values[i];
+    if (!Number.isFinite(v)) continue;
+    const x = metricValueX(rect, v, vLo, vHi);
+    const y = binIndexY(rect, i, nBins, binPad);
+    drawMarker(ctx, x, y, color, style);
+  }
+}
+
+function drawFrequencyYTicksByBin(
+  ctx,
+  rect,
+  fSorted,
+  nBins,
+  tickIndices,
+  padRatio,
+  { labeled = true, fontSize = 9 } = {},
+) {
+  const c = getChartColors();
+  ctx.strokeStyle = c.grid;
+  ctx.lineWidth = 1;
+  if (labeled) {
+    ctx.fillStyle = c.label;
+    ctx.font = `${fontSize}px 'DM Sans', system-ui, sans-serif`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+  }
+
+  for (const i of tickIndices) {
+    const y = binIndexY(rect, i, nBins, padRatio);
+    ctx.beginPath();
+    ctx.moveTo(rect.x0, y);
+    ctx.lineTo(rect.x0 + rect.w, y);
+    ctx.stroke();
+    if (labeled && fSorted[i] != null) {
+      ctx.fillText(formatFreqHz(fSorted[i]), rect.x0 - 6, y);
+    }
+  }
+}
+
+function drawMetricXTicks(
+  ctx,
+  rect,
+  vLo,
+  vHi,
+  { n = 5, labeled = true, fontSize = 9 } = {},
+) {
+  const vSpan = vHi - vLo || 1;
+  const c = getChartColors();
+  ctx.strokeStyle = c.grid;
+  ctx.lineWidth = 1;
+  if (labeled) {
+    ctx.fillStyle = c.label;
+    ctx.font = `${fontSize}px 'DM Sans', system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+  }
+
+  for (let i = 0; i < n; i++) {
+    const v = vLo + (vSpan * i) / (n - 1 || 1);
+    const x = metricValueX(rect, v, vLo, vHi);
+    ctx.beginPath();
+    ctx.moveTo(x, rect.y0);
+    ctx.lineTo(x, rect.y0 + rect.h);
+    ctx.stroke();
+    if (labeled) {
+      ctx.fillText(formatMetricValue(v), x, rect.y0 + rect.h + 4);
+    }
+  }
+}
+
+function drawFrequencyYTicksByHz(
+  ctx,
+  rect,
+  fMin,
+  fMax,
+  tickHz,
+  padRatio,
+  freqAxisScale,
+  { labeled = true, fontSize = 9 } = {},
+) {
+  const c = getChartColors();
+  ctx.strokeStyle = c.grid;
+  ctx.lineWidth = 1;
+  if (labeled) {
+    ctx.fillStyle = c.label;
+    ctx.font = `${fontSize}px 'DM Sans', system-ui, sans-serif`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+  }
+
+  for (const f of tickHz) {
+    const y = freqScaleY(rect, f, fMin, fMax, padRatio, resolveHzScale(freqAxisScale));
+    ctx.beginPath();
+    ctx.moveTo(rect.x0, y);
+    ctx.lineTo(rect.x0 + rect.w, y);
+    ctx.stroke();
+    if (labeled) {
+      ctx.fillText(formatFreqHz(f), rect.x0 - 6, y);
+    }
+  }
+}
+
 export function drawGrid(ctx, rect, width, height) {
   const c = getChartColors();
   ctx.fillStyle = c.bg;
@@ -448,99 +745,6 @@ export function drawAxisLabels(ctx, width, height, xLabel, yLabel) {
   ctx.rotate(-Math.PI / 2);
   ctx.fillText(yLabel, 0, 0);
   ctx.restore();
-}
-
-/** Draw matrix heatmap (rows = y-axis, cols = x-axis). Optional bool mask overlays outliers. */
-export function drawHeatmap(ctx, rect, values2d, outlierMask) {
-  const nY = values2d.length;
-  const nX = values2d[0]?.length ?? 0;
-  if (!nY || !nX) return;
-
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (let y = 0; y < nY; y++) {
-    for (let x = 0; x < nX; x++) {
-      const v = values2d[y][x];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-  }
-  const span = hi - lo || 1;
-  const cellW = rect.w / nX;
-  const cellH = rect.h / nY;
-
-  for (let y = 0; y < nY; y++) {
-    for (let x = 0; x < nX; x++) {
-      const norm = (values2d[y][x] - lo) / span;
-      const [r, g, b] = viridis(norm);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      const px = rect.x0 + x * cellW;
-      const py = rect.y0 + rect.h - (y + 1) * cellH;
-      ctx.fillRect(px, py, cellW + 0.5, cellH + 0.5);
-    }
-  }
-
-  if (outlierMask?.length) {
-    ctx.strokeStyle = getChartColors().outlierStroke;
-    ctx.lineWidth = 1.5;
-    for (let y = 0; y < nY; y++) {
-      for (let x = 0; x < nX; x++) {
-        if (!outlierMask[y]?.[x]) continue;
-        const px = rect.x0 + x * cellW;
-        const py = rect.y0 + rect.h - (y + 1) * cellH;
-        ctx.strokeRect(px + 0.5, py + 0.5, cellW - 1, cellH - 1);
-      }
-    }
-  }
-}
-
-/** Draw decimated spectrogram (rows = freq, cols = time). */
-export function drawSpectrogram(ctx, rect, db2d, tMin, tMax, fMin, fMax) {
-  const nF = db2d.length;
-  const nT = db2d[0]?.length ?? 0;
-  if (!nF || !nT) return;
-
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (let f = 0; f < nF; f++) {
-    for (let t = 0; t < nT; t++) {
-      const v = db2d[f][t];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
-    }
-  }
-  const span = hi - lo || 1;
-  const cellW = rect.w / nT;
-  const cellH = rect.h / nF;
-
-  for (let f = 0; f < nF; f++) {
-    for (let t = 0; t < nT; t++) {
-      const norm = (db2d[f][t] - lo) / span;
-      const [r, g, b] = viridis(norm);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      const x = rect.x0 + t * cellW;
-      const y = rect.y0 + rect.h - (f + 1) * cellH;
-      ctx.fillRect(x, y, cellW + 0.5, cellH + 0.5);
-    }
-  }
-  void tMin;
-  void tMax;
-  void fMin;
-  void fMax;
-}
-
-function viridis(t) {
-  const c0 = [68, 1, 84];
-  const c1 = [59, 82, 139];
-  const c2 = [33, 145, 140];
-  const c3 = [253, 231, 37];
-  if (t < 0.33) return lerp(c0, c1, t / 0.33);
-  if (t < 0.66) return lerp(c1, c2, (t - 0.33) / 0.33);
-  return lerp(c2, c3, (t - 0.66) / 0.34);
-}
-
-function lerp(a, b, t) {
-  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
 }
 
 /** Map display azimuth (0° = front) to canvas radians; front at top. */
@@ -799,6 +1003,7 @@ export function drawAzimuthLineChart(
     reference = null,
     showPrimary = true,
     comparisonLayout = false,
+    swapAxes = false,
   } = {},
 ) {
   if (!azimuths?.length || !values?.length) return;
@@ -824,6 +1029,46 @@ export function drawAzimuthLineChart(
   ctx.fillStyle = c.bg;
   ctx.fillRect(0, 0, width, height);
 
+  const selStyle = COMPARISON_SERIES_STYLE.selected;
+  const refStyle = COMPARISON_SERIES_STYLE.reference;
+  const tickFontSize = comparisonLayout ? COMPARISON_GRID.fontSize : 10;
+
+  if (swapAxes) {
+    drawAzimuthYTicks(ctx, rect, xs, xMin, xMax);
+    if (comparisonLayout) {
+      drawMetricXTicks(ctx, rect, vLo, vHi, {
+        n: COMPARISON_GRID.yTicks,
+        labeled: true,
+        fontSize: tickFontSize,
+      });
+    } else {
+      ctx.strokeStyle = c.grid;
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const x = rect.x0 + (rect.w * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(x, rect.y0);
+        ctx.lineTo(x, rect.y0 + rect.h);
+        ctx.stroke();
+      }
+    }
+    if (showPrimary) {
+      drawVerticalLineSeries(ctx, rect, xs, measured, c.accent, xMin, xMax, vLo, vHi);
+      drawVerticalScatter(ctx, rect, xs, measured, c.accent, xMin, xMax, vLo, vHi, selStyle.pointRadius);
+    }
+    if (reference && ref?.length) {
+      drawVerticalLineSeries(ctx, rect, xs, ref, c.reference, xMin, xMax, vLo, vHi);
+      drawVerticalScatter(ctx, rect, xs, ref, c.reference, xMin, xMax, vLo, vHi, refStyle.pointRadius);
+    }
+    if (comparisonLayout) {
+      drawComparisonAxisFrame(ctx, rect);
+      drawProfileAxisLabels(ctx, width, height, yLabel, "Azimuth (°)");
+    } else {
+      drawAxisLabels(ctx, width, height, yLabel, "Azimuth (°)");
+    }
+    return;
+  }
+
   if (comparisonLayout) {
     drawComparisonYGrid(ctx, rect, vLo, vHi);
   } else {
@@ -841,9 +1086,6 @@ export function drawAzimuthLineChart(
   drawAzimuthXTicks(ctx, rect, xs, xMin, xMax, {
     fontSize: comparisonLayout ? COMPARISON_GRID.fontSize : 10,
   });
-
-  const selStyle = COMPARISON_SERIES_STYLE.selected;
-  const refStyle = COMPARISON_SERIES_STYLE.reference;
 
   if (showPrimary) {
     drawLineSeries(ctx, rect, xs, measured, c.accent, xMin, xMax, vLo, vHi, selStyle);
@@ -1053,6 +1295,7 @@ export function drawFrequencyProfileChart(
     showOverlay = true,
     comparisonLayout = false,
     freqAxisScale = "mel",
+    swapAxes = false,
   } = {},
 ) {
   if (!freqs?.length) return;
@@ -1088,39 +1331,67 @@ export function drawFrequencyProfileChart(
   const { lo, hi } = minMax(all);
   const { vLo, vHi } = valueRangeTight(lo, hi);
   const useComparison = comparisonLayout && showAxisLabels;
-  const scaledFreqX =
-    (useComparison || detailed) && (freqAxisScale === "mel" || freqAxisScale === "linear");
+  const useBands = freqAxisScale === "bands";
+  const hzScale = resolveHzScale(freqAxisScale);
+  const useHzPosition = !useBands;
   const fMin = fSorted[0];
   const fMax = fSorted[fSorted.length - 1];
-  const fPad = scaledFreqX ? 0 : showAxisLabels ? 0.04 : 0.06;
-  const binPad = scaledFreqX ? 0 : fPad;
-  const scale = freqAxisScale === "linear" ? "linear" : "mel";
+  const fPad = useHzPosition || swapAxes ? 0 : showAxisLabels ? 0.04 : 0.06;
+  const binPad = useHzPosition || swapAxes ? 0 : fPad;
   const tickFontSize = useComparison
     ? COMPARISON_GRID.fontSize
     : detailed
       ? 10
       : 9;
 
-  if (scaledFreqX) {
-    const tickHz = useComparison
-      ? pickFreqScaleTicks(fMin, fMax, COMPARISON_GRID.freqXTicks, scale)
-      : pickFreqScaleTicks(fMin, fMax, Math.min(7, nBins), scale);
-    drawFrequencyXTicksByHz(ctx, rect, fMin, fMax, tickHz, fPad, scale, {
-      labeled: showAxisLabels,
-      fontSize: tickFontSize,
-    });
-  } else {
-    const tickIndices = pickFrequencyBinTicks(nBins, detailed);
-    if (detailed) {
+  if (swapAxes) {
+    if (useBands) {
+      const tickIndices = useComparison
+        ? pickComparisonBinTicks(nBins, COMPARISON_GRID.xTickCount)
+        : pickFrequencyBinTicks(nBins, detailed);
+      drawFrequencyYTicksByBin(ctx, rect, fSorted, nBins, tickIndices, binPad, {
+        labeled: showAxisLabels,
+        fontSize: tickFontSize,
+      });
+    } else {
+      const tickHz = useComparison
+        ? pickFreqScaleTicks(fMin, fMax, COMPARISON_GRID.freqXTicks, hzScale)
+        : pickFreqScaleTicks(fMin, fMax, Math.min(7, nBins), hzScale);
+      drawFrequencyYTicksByHz(ctx, rect, fMin, fMax, tickHz, fPad, hzScale, {
+        labeled: showAxisLabels,
+        fontSize: tickFontSize,
+      });
+    }
+    if (showAxisLabels) {
+      const metricTicks = useComparison ? COMPARISON_GRID.yTicks : detailed ? 7 : 5;
+      drawMetricXTicks(ctx, rect, vLo, vHi, {
+        n: metricTicks,
+        labeled: true,
+        fontSize: tickFontSize,
+      });
+    }
+  } else if (useBands) {
+    const tickIndices = useComparison
+      ? pickComparisonBinTicks(nBins, COMPARISON_GRID.xTickCount)
+      : pickFrequencyBinTicks(nBins, detailed);
+    if (detailed && !useComparison) {
       drawFrequencyMinorGridByBin(ctx, rect, nBins, tickIndices, binPad);
     }
     drawFrequencyXTicksByBin(ctx, rect, fSorted, nBins, tickIndices, binPad, {
       labeled: showAxisLabels,
       fontSize: tickFontSize,
     });
+  } else {
+    const tickHz = useComparison
+      ? pickFreqScaleTicks(fMin, fMax, COMPARISON_GRID.freqXTicks, hzScale)
+      : pickFreqScaleTicks(fMin, fMax, Math.min(7, nBins), hzScale);
+    drawFrequencyXTicksByHz(ctx, rect, fMin, fMax, tickHz, fPad, hzScale, {
+      labeled: showAxisLabels,
+      fontSize: tickFontSize,
+    });
   }
 
-  if (showAxisLabels) {
+  if (showAxisLabels && !swapAxes) {
     if (useComparison) {
       drawComparisonYGrid(ctx, rect, vLo, vHi);
     } else {
@@ -1143,41 +1414,64 @@ export function drawFrequencyProfileChart(
   const refStyle = COMPARISON_SERIES_STYLE.reference;
 
   if (showPrimary) {
-    if (scaledFreqX) {
-      drawProfileLineByFreq(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, scale, selStyle);
-      drawProfileScatterByFreq(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, scale, selStyle);
-    } else {
+    if (swapAxes) {
+      if (useBands) {
+        drawProfileLineByBinSwapped(ctx, rect, vSorted, nBins, c.accent, vLo, vHi, binPad, selStyle);
+        drawProfileScatterByBinSwapped(ctx, rect, vSorted, nBins, c.accent, vLo, vHi, binPad, selStyle);
+      } else {
+        drawProfileLineSwapped(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, hzScale, selStyle);
+        drawProfileScatterSwapped(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, hzScale, selStyle);
+      }
+    } else if (useBands) {
       drawProfileLineByBin(ctx, rect, vSorted, nBins, c.accent, vLo, vHi, binPad, selStyle);
       drawProfileScatterByBin(ctx, rect, vSorted, nBins, c.accent, vLo, vHi, binPad, selStyle);
+    } else {
+      drawProfileLineByFreq(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, hzScale, selStyle);
+      drawProfileScatterByFreq(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, hzScale, selStyle);
     }
   }
   if (showOverlay && overlaySorted?.length) {
     const overlayStyle = { lineWidth: 1.25, dashed: false, pointRadius: 2.5, pointHollow: false };
-    if (scaledFreqX) {
-      drawProfileLineByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, scale, overlayStyle);
-      drawProfileScatterByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, scale, overlayStyle);
-    } else {
+    if (swapAxes) {
+      if (useBands) {
+        drawProfileLineByBinSwapped(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
+        drawProfileScatterByBinSwapped(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
+      } else {
+        drawProfileLineSwapped(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
+        drawProfileScatterSwapped(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
+      }
+    } else if (useBands) {
       drawProfileLineByBin(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad);
       drawProfileScatterByBin(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
+    } else {
+      drawProfileLineByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
+      drawProfileScatterByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
     }
   }
   if (showReference && refSorted?.length) {
-    if (scaledFreqX) {
-      drawProfileLineByFreq(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, scale, refStyle);
-      drawProfileScatterByFreq(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, scale, refStyle);
-    } else {
+    if (swapAxes) {
+      if (useBands) {
+        drawProfileLineByBinSwapped(ctx, rect, refSorted, nBins, c.reference, vLo, vHi, binPad, refStyle);
+        drawProfileScatterByBinSwapped(ctx, rect, refSorted, nBins, c.reference, vLo, vHi, binPad, refStyle);
+      } else {
+        drawProfileLineSwapped(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, hzScale, refStyle);
+        drawProfileScatterSwapped(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, hzScale, refStyle);
+      }
+    } else if (useBands) {
       drawProfileLineByBin(ctx, rect, refSorted, nBins, c.reference, vLo, vHi, binPad, refStyle);
       drawProfileScatterByBin(ctx, rect, refSorted, nBins, c.reference, vLo, vHi, binPad, refStyle);
+    } else {
+      drawProfileLineByFreq(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, hzScale, refStyle);
+      drawProfileScatterByFreq(ctx, rect, fSorted, refSorted, c.reference, vLo, vHi, fMin, fMax, fPad, hzScale, refStyle);
     }
   }
 
   if (showAxisLabels) {
-    const xTitle = scaledFreqX
-      ? scale === "linear"
-        ? "Frequency (Hz, linear)"
-        : "Frequency (Hz, mel scale)"
-      : "Frequency (Hz)";
-    drawProfileAxisLabels(ctx, width, height, xTitle, yLabel);
+    if (swapAxes) {
+      drawProfileAxisLabels(ctx, width, height, yLabel, freqAxisTitle(freqAxisScale, { vertical: true }));
+    } else {
+      drawProfileAxisLabels(ctx, width, height, freqAxisTitle(freqAxisScale), yLabel);
+    }
   }
 }
 

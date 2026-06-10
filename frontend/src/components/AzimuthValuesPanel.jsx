@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AzimuthMiniChart from "./AzimuthMiniChart";
 import ChartLegend from "./ChartLegend";
+import SwapAxesButton from "./SwapAxesButton";
 import { sortedAzimuthSlots, azimuthSlotKey } from "../utils/azimuthSlots";
 import {
   buildRecordComparisonLegend,
@@ -10,6 +11,7 @@ import {
 import { COMPARISON_CHART_HEIGHT } from "../canvas/draw";
 import { getMetricMeta, VALUE_METRICS } from "../utils/metrics";
 import { FREQ_AXIS_SCALES, freqAxisHint } from "../utils/freqAxisScale";
+import { plotLayoutHint } from "../utils/plotTransform";
 
 const CHART_HEIGHT = 420;
 
@@ -28,13 +30,23 @@ export default function AzimuthValuesPanel({
   legendVisible: legendVisibleProp,
   onLegendToggle,
   hideLegend = false,
+  swapAxes: swapAxesProp,
+  onSwapAxesChange,
+  freqAxisScale: freqAxisScaleProp,
+  onFreqAxisScaleChange,
+  showFreqPlotControls = true,
 }) {
   const [metricInternal, setMetricInternal] = useState("normILD");
   const metric = metricProp ?? metricInternal;
   const setMetric = onMetricChange ?? setMetricInternal;
   const slots = useMemo(() => sortedAzimuthSlots(azimuths), [azimuths]);
   const [azimuthKey, setAzimuthKey] = useState("");
-  const [freqAxisScale, setFreqAxisScale] = useState("mel");
+  const [swapAxesInternal, setSwapAxesInternal] = useState(false);
+  const [freqAxisScaleInternal, setFreqAxisScaleInternal] = useState("mel");
+  const swapAxes = swapAxesProp ?? swapAxesInternal;
+  const setSwapAxes = onSwapAxesChange ?? setSwapAxesInternal;
+  const freqAxisScale = freqAxisScaleProp ?? freqAxisScaleInternal;
+  const setFreqAxisScale = onFreqAxisScaleChange ?? setFreqAxisScaleInternal;
   const [legendInternal, setLegendInternal] = useState(() =>
     defaultLegendVisibility({ includeReference: showReferenceLegend })
   );
@@ -67,7 +79,9 @@ export default function AzimuthValuesPanel({
     showReference: showReferenceLegend && !!referenceMatrix,
   });
 
-  const title = chartTitle ?? `${metricMeta.label} vs frequency`;
+  const title =
+    chartTitle ??
+    (swapAxes ? `${metricMeta.yLabel} vs frequency` : `${metricMeta.label} vs frequency`);
 
   const azimuthSelect = (
     <label className="field inline-field direction-az-select">
@@ -89,9 +103,9 @@ export default function AzimuthValuesPanel({
     </label>
   );
 
-  const freqScaleSelect = (
+  const freqScaleSelect = showFreqPlotControls && (
     <label className="field inline-field direction-freq-scale-select">
-      <span>Freq. axis</span>
+      <span>Freq. scale</span>
       <select
         value={freqAxisScale}
         onChange={(e) => setFreqAxisScale(e.target.value)}
@@ -104,6 +118,15 @@ export default function AzimuthValuesPanel({
         ))}
       </select>
     </label>
+  );
+
+  const swapButton = showFreqPlotControls && (
+    <SwapAxesButton
+      active={swapAxes}
+      onClick={() => setSwapAxes(!swapAxes)}
+      title="Swap frequency and metric axes"
+      ariaLabel="Swap frequency and metric axes"
+    />
   );
 
   const metricSelect = showMetricControl && (
@@ -127,6 +150,7 @@ export default function AzimuthValuesPanel({
           {metricSelect}
           {freqScaleSelect}
           {azimuthSelect}
+          {swapButton}
         </div>
       </div>
 
@@ -141,8 +165,8 @@ export default function AzimuthValuesPanel({
             Use the <strong>Metric</strong> dropdown to switch between them.
           </p>
           <p className="muted small azimuth-chart-hint">
-        {freqAxisHint(freqAxisScale)}; {metricMeta.yLabel} on the vertical axis (min at bottom,
-        max at top).
+            {plotLayoutHint({ swapAxes, metricYLabel: metricMeta.yLabel, freqAxisScale })}.
+            {showFreqPlotControls && ` ${freqAxisHint(freqAxisScale)}.`}
           </p>
         </>
       )}
@@ -159,6 +183,7 @@ export default function AzimuthValuesPanel({
             showHeading={false}
             detailed={!compact}
             comparisonLayout={compact}
+            swapAxes={swapAxes}
             freqAxisScale={freqAxisScale}
             visibility={{
               primary: legendVisible[LEGEND_IDS.selected],

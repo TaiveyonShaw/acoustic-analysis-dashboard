@@ -1,21 +1,21 @@
 # Acoustic Analysis Dashboard
 
-Interactive **React** dashboard for hearing-aid acoustic analysis: **WAV** frame-level outlier detection and **OSF thestruct MAT** files (ILD/ITD spatial maps). A FastAPI backend runs librosa/scikit-learn analysis; the frontend renders charts with **Canvas** (no Plotly/Recharts) for a small bundle and fast paint.
+Interactive **React** dashboard for **OSF thestruct MAT** files — ILD/ITD spatial maps from hearing-aid research data. A FastAPI backend loads MATLAB structs; the frontend renders charts with **Canvas** (no Plotly/Recharts) for a small bundle and fast paint.
 
 ## Architecture
 
 ```
 frontend/          React + Vite + plain CSS (Canvas charts)
-api/main.py        FastAPI — POST /api/analyze
-src/acoustic_analysis/   Feature extraction & outlier detection
+api/main.py        FastAPI — OSF catalog + POST /api/analyze
+src/acoustic_analysis/   thestruct MAT loading & direction accuracy
 ```
 
 **Speed choices**
 
-- API returns downsampled waveform (~4k points) and decimated spectrogram
+- OSF file listing proxied through the API (avoids browser CORS)
 - Canvas 2D rendering instead of heavy chart libraries
-- Debounced re-analysis when settings change
-- `AbortController` cancels in-flight requests on new uploads
+- Debounced re-analysis when the selected record changes
+- `AbortController` cancels in-flight requests on new selections
 
 ## Quick start (development)
 
@@ -69,9 +69,8 @@ One **Web Service** runs the API and the built React UI (Docker).
 
 | Topic | Detail |
 |-------|--------|
-| **Cold starts** | Service sleeps after ~15 min idle; first request may take 30–60s while Python/librosa load. |
-| **RAM** | Use **≥512 MB**; **1 GB** is safer for longer WAV files. |
-| **Timeouts** | HTTP requests must finish within Render’s limit (upgrade if analysis times out). |
+| **Cold starts** | Service sleeps after ~15 min idle; first request may take a few seconds while Python loads. |
+| **RAM** | **512 MB** is sufficient for MAT analysis. |
 | **CORS** | Same-origin on Render (UI + API one URL). For Netlify UI + Render API, set `CORS_ORIGINS` to your Netlify URL and build with `VITE_API_URL=https://<your-service>.onrender.com/api`. |
 
 ### Environment variables (Render dashboard)
@@ -80,23 +79,23 @@ One **Web Service** runs the API and the built React UI (Docker).
 |----------|---------|
 | `CORS_ORIGINS` | Comma-separated allowed origins (add Netlify URL if UI is hosted elsewhere) |
 | `VITE_API_URL` | Build-time only — set in frontend build if UI and API are on different hosts |
-
-## Optional Streamlit UI
-
-```bash
-pip install -e ".[streamlit]"
-streamlit run app.py
-```
+| `OSF_NODE_ID` | OSF project ID (default: `xnr9f`) |
 
 ## API
 
-`POST /api/analyze` — multipart form:
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/osf/folders` | List product folders (More, Opn) |
+| `GET /api/osf/folders/{id}/files` | List `.mat` files in a folder |
+| `POST /api/analyze/osf` | Download and analyze an OSF file |
+| `POST /api/analyze` | Upload a local `.mat` file |
+
+Multipart form fields for analyze endpoints:
 
 | Field | Purpose |
 |-------|---------|
-| `file` | `.wav` recording or OSF `.mat` thestruct file |
-| `record_index` | For MAT files: which of the 63 aid/room/run records to visualize (0–62) |
-| `method`, `contamination`, `z_threshold`, `iqr_multiplier` | Outlier detector settings |
+| `file` / `download_url` + `file_name` | MAT file source |
+| `record_index` | Which of the 63 aid/room/run records to visualize (0–62) |
 
 ### MAT (thestruct) format
 
@@ -109,15 +108,15 @@ Each OSF `thestruct_*.mat` file contains one variable (e.g. `thestruct_MoreA1`) 
 | `freqs` | 28 frequency bins (Hz) |
 | `rawILD`, `normILD`, `rawITD`, `normITD` | 11×28 matrices |
 
-Sample data lives in `osf-storage/More_thestructs/` and `osf-storage/Opn_thestructs/`.
+Sample data: [OSF Data Science 2022–2023](https://osf.io/xnr9f/overview) (`More_thestructs/`, `Opn_thestructs/`).
 
 ## Library usage
 
 ```python
-from acoustic_analysis import AcousticAnalyzer
+from acoustic_analysis import load_thestruct_path
 
-result = AcousticAnalyzer().analyze_file("recording.wav")
-print(result.outlier_regions)
+thestruct = load_thestruct_path("thestruct_MoreA1.mat")
+print(thestruct.subject, len(thestruct.records))
 ```
 
 ## Requirements
