@@ -28,15 +28,9 @@
   --chart-grid: rgba(255, 255, 255, 0.18);
   --chart-label: #cccccc;
   --chart-accent: #79b8ff;
-  --chart-muted: #8b949e;
   --chart-reference: #ff7f0e;
-  --chart-series: #2ca02c;
   --chart-spoke: #444444;
   --chart-listener: #79b8ff;
-  --chart-good: 80, 227, 194;
-  --chart-bad: 238, 68, 68;
-  --chart-outlier-fill: rgba(238, 68, 68, 0.15);
-  --chart-outlier-stroke: rgba(238, 68, 68, 0.85);
   --chart-polar-guide: rgba(255, 255, 255, 0.12);
 }
 
@@ -60,15 +54,9 @@
   --chart-grid: rgba(0, 0, 0, 0.15);
   --chart-label: #000000;
   --chart-accent: #0f62fe;
-  --chart-muted: #7f7f7f;
   --chart-reference: #ff7f0e;
-  --chart-series: #2ca02c;
   --chart-spoke: #cccccc;
   --chart-listener: #0f62fe;
-  --chart-good: 25, 128, 56;
-  --chart-bad: 218, 30, 40;
-  --chart-outlier-fill: rgba(218, 30, 40, 0.12);
-  --chart-outlier-stroke: rgba(218, 30, 40, 0.9);
   --chart-polar-guide: rgba(22, 22, 22, 0.16);
 }
 
@@ -492,7 +480,9 @@ body,
 
 .azimuth-mini-chart {
   min-width: 0;
+  width: 100%;
   pointer-events: none;
+  container-type: inline-size;
 }
 
 .azimuth-mini-chart h4 {
@@ -504,7 +494,16 @@ body,
 }
 
 .azimuth-mini-canvas-wrap {
-  min-height: 0;
+  width: 100%;
+  min-height: 240px;
+  height: clamp(240px, max(42cqi, 48vh), 620px);
+  box-sizing: border-box;
+}
+
+.azimuth-mini-canvas-wrap .chart-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .mfcc-chart-hint {
@@ -866,33 +865,6 @@ td {
   margin: 0.15rem 0 0.5rem;
 }
 
-.accuracy-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.metric-inline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.metric-inline .metric-label {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.metric-inline .metric-value {
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.metric-inline.warn .metric-value {
-  color: var(--warn);
-}
-
 .direction-charts-stack {
   display: flex;
   flex-direction: column;
@@ -937,18 +909,17 @@ td {
 }
 
 .comparison-chart-plot {
-  flex: 0 0 var(--comparison-chart-height, 280px);
-  height: var(--comparison-chart-height, 280px);
-  min-height: var(--comparison-chart-height, 280px);
-  max-height: var(--comparison-chart-height, 280px);
+  flex: 1 1 auto;
   width: 100%;
   box-sizing: border-box;
+  height: clamp(200px, max(36cqi, 40vh), 560px);
+  min-height: 200px;
 }
 
 .comparison-chart-plot .chart-canvas {
   display: block;
   width: 100%;
-  height: var(--comparison-chart-height, 280px);
+  height: 100%;
 }
 
 .values-by-azimuth-wrap {
@@ -1150,6 +1121,20 @@ td {
   max-width: 100%;
 }
 
+.wip-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .polar-canvas {
   width: 100%;
   max-width: 100%;
@@ -1228,14 +1213,6 @@ td {
   border-radius: 1px;
 }
 
-.swatch.series {
-  background: var(--chart-series);
-}
-
 .azimuth-ild-explainer code {
   font-size: 0.85em;
-}
-
-.direction-table tr.low-accuracy td {
-  color: var(--danger);
 }

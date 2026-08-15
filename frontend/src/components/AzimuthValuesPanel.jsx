@@ -8,12 +8,9 @@ import {
   defaultLegendVisibility,
   LEGEND_IDS,
 } from "../utils/chartLegend";
-import { COMPARISON_CHART_HEIGHT } from "../canvas/draw";
 import { getMetricMeta, VALUE_METRICS } from "../utils/metrics";
 import { FREQ_AXIS_SCALES, freqAxisHint } from "../utils/freqAxisScale";
 import { plotLayoutHint } from "../utils/plotTransform";
-
-const CHART_HEIGHT = 420;
 
 export default function AzimuthValuesPanel({
   matrices,
@@ -189,7 +186,6 @@ export default function AzimuthValuesPanel({
               primary: legendVisible[LEGEND_IDS.selected],
               reference: legendVisible[LEGEND_IDS.reference],
             }}
-            canvasHeight={compact ? COMPARISON_CHART_HEIGHT : CHART_HEIGHT}
             theme={theme}
           />
           {!hideLegend && legendItems.length > 0 && (

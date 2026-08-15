@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   setupCanvas,
   plotRectComparison,
-  COMPARISON_CHART_HEIGHT,
   drawPolarAccuracy,
   drawAzimuthLineChart,
 } from "../canvas/draw";
@@ -54,14 +53,14 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
     const canvas = polarRef.current;
     if (!canvas || !hasReference) return;
     const { ctx, width, height } = setupCanvas(canvas, 320);
-    drawPolarAccuracy(ctx, width, height, directionAccuracy.perDirection);
-  }, [directionAccuracy, hasReference]);
+    drawPolarAccuracy(ctx, width, height, selected?.azimuths);
+  }, [selected?.azimuths, hasReference]);
 
   const drawProfile = useCallback(() => {
     const canvas = profileRef.current;
     const matrix = matrices?.[metric];
     if (!canvas || !hasReference || !matrix) return;
-    const { ctx, width, height } = setupCanvas(canvas, COMPARISON_CHART_HEIGHT);
+    const { ctx, width, height } = setupCanvas(canvas);
     const rect = plotRectComparison(width, height);
     const az = selected.azimuths;
     const fi = Math.min(freqIdx, (selected.freqs?.length ?? 1) - 1);
@@ -78,13 +77,6 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
 
   useChartRedraw(polarRef, drawPolar, [drawPolar, theme]);
   useChartRedraw(profileRef, drawProfile, [drawProfile, theme]);
-
-  const sorted = hasReference
-    ? [...directionAccuracy.perDirection].sort((a, b) => b.accuracyPct - a.accuracyPct)
-    : [];
-  const worst = hasReference
-    ? [...directionAccuracy.perDirection].sort((a, b) => a.accuracyPct - b.accuracyPct)[0]
-    : null;
 
   const comparisonLegendItems = buildRecordComparisonLegend(legendVisible, {
     showReference: hasReference,
@@ -118,25 +110,8 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
 
   return (
     <section className="chart-card direction-accuracy">
-      <h3>Direction accuracy</h3>
-
       {hasReference ? (
         <>
-          <div className="accuracy-summary">
-            <div className="metric-inline">
-              <span className="metric-label">Overall</span>
-              <span className="metric-value">{directionAccuracy.overallAccuracyPct}%</span>
-            </div>
-            {worst && (
-              <div className="metric-inline warn">
-                <span className="metric-label">Weakest direction</span>
-                <span className="metric-value">
-                  {worst.azimuth}° ({worst.accuracyPct}%)
-                </span>
-              </div>
-            )}
-          </div>
-
           <div className="direction-charts-stack">
             <div className="direction-shared-controls direction-chart-header direction-chart-header--title-inline">
               <h4 className="direction-shared-heading">Charts</h4>
@@ -157,10 +132,7 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
                 </label>
               </div>
             </div>
-            <div
-              className="direction-charts-pair"
-              style={{ "--comparison-chart-height": `${COMPARISON_CHART_HEIGHT}px` }}
-            >
+            <div className="direction-charts-pair">
               <div className="comparison-chart-column profile-wrap">
                 <div className="direction-chart-header direction-chart-header--title-inline">
                   <h4>
@@ -201,31 +173,15 @@ export default function DirectionAccuracyChart({ directionAccuracy, selected, ma
             </div>
             <ChartLegend items={comparisonLegendItems} onToggle={toggleLegend} />
             <div className="polar-wrap">
-              <h4>Polar map</h4>
+              <h4>
+                Polar map{" "}
+                <span className="wip-badge">Under construction — not complete</span>
+              </h4>
               <p className="muted small">Spokes mark each source direction (top = front)</p>
               <div className="chart-canvas-wrap">
                 <canvas ref={polarRef} className="chart-canvas polar-canvas" />
               </div>
             </div>
-          </div>
-
-          <div className="table-wrap">
-            <table className="direction-table">
-              <thead>
-                <tr>
-                  <th>Azimuth</th>
-                  <th>Accuracy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((d) => (
-                  <tr key={d.azimuth} className={d.accuracyPct < 50 ? "low-accuracy" : ""}>
-                    <td>{d.azimuth}°</td>
-                    <td>{d.accuracyPct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </>
       ) : (

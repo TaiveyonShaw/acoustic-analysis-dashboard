@@ -116,7 +116,7 @@ export default function App() {
           <h1>Hearing Aid Acoustic Analysis</h1>
           <p>
             ILD/ITD spatial maps from OSF thestruct MAT files — hearing-aid, room, and run
-            conditions. Line charts, polar maps, and direction accuracy.
+            conditions. Line charts and polar maps.
           </p>
         </header>
 

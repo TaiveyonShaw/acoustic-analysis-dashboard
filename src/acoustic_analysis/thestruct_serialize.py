@@ -43,7 +43,6 @@ def thestruct_to_payload(thestruct: ThestructFile, *, record_index: int) -> dict
             "nAzimuths": len(selected.azimuths),
             "nFreqs": len(selected.freqs),
             "selectedIndex": record_index,
-            "directionAccuracyPct": direction_accuracy.get("overallAccuracyPct"),
         },
         "records": records_meta,
         "selected": _record_payload(selected),

@@ -12,8 +12,7 @@ export default function AzimuthMiniChart({
   freqs,
   values,
   referenceValues,
-  overlayValues,
-  visibility = { primary: true, reference: true, overlay: true },
+  visibility = { primary: true, reference: true },
   yLabel,
   showAxisLabels = false,
   showHeading = true,
@@ -21,7 +20,6 @@ export default function AzimuthMiniChart({
   comparisonLayout = false,
   swapAxes = false,
   freqAxisScale = "mel",
-  canvasHeight = 160,
   theme,
 }) {
   const ref = useRef(null);
@@ -29,7 +27,7 @@ export default function AzimuthMiniChart({
   const draw = useCallback(() => {
     const canvas = ref.current;
     if (!canvas || !freqs?.length || !values?.length) return;
-    const { ctx, width, height } = setupCanvas(canvas, canvasHeight);
+    const { ctx, width, height } = setupCanvas(canvas);
     const rect = comparisonLayout
       ? plotRectComparison(width, height)
       : plotRectFrequencyProfile(width, height, {
@@ -40,20 +38,17 @@ export default function AzimuthMiniChart({
       yLabel,
       showAxisLabels,
       reference: referenceValues,
-      overlay: overlayValues,
       detailed: comparisonLayout ? true : detailed,
       comparisonLayout,
       swapAxes,
       freqAxisScale,
       showPrimary: visibility.primary !== false,
       showReference: visibility.reference !== false,
-      showOverlay: visibility.overlay !== false,
     });
   }, [
     freqs,
     values,
     referenceValues,
-    overlayValues,
     visibility,
     yLabel,
     showAxisLabels,
@@ -61,7 +56,6 @@ export default function AzimuthMiniChart({
     comparisonLayout,
     swapAxes,
     freqAxisScale,
-    canvasHeight,
   ]);
 
   useChartRedraw(ref, draw, [draw, theme]);
@@ -71,7 +65,6 @@ export default function AzimuthMiniChart({
       {showHeading && <h4>{azimuth}°</h4>}
       <div
         className={`chart-canvas-wrap${comparisonLayout ? " comparison-chart-plot" : " azimuth-mini-canvas-wrap"}`}
-        style={comparisonLayout ? undefined : { minHeight: canvasHeight }}
       >
         <canvas ref={ref} className="chart-canvas" />
       </div>

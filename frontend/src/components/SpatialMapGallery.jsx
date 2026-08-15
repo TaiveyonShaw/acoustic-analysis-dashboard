@@ -100,7 +100,10 @@ export default function SpatialMapGallery({ matrices, azimuths, freqs, theme }) 
     <section className="chart-card spatial-map-gallery">
       <div className="direction-chart-header direction-chart-header--title-inline">
         <div>
-          <h3>Spatial maps (all 3 dimensions)</h3>
+          <h3>
+            Spatial maps{" "}
+            <span className="wip-badge">Under construction — not complete</span>
+          </h3>
           <p className="muted small spatial-map-lead">
             Full {azimuths?.length ?? 11}×{freqs?.length ?? 28} grid — azimuth, frequency, and{" "}
             {metricMeta.yLabel} together.

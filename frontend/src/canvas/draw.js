@@ -3,52 +3,37 @@
 import { freqAxisTitle } from "../utils/freqAxisScale";
 import { getChartColors } from "./themeColors";
 
-export function setupCanvas(canvas, heightCss = 220) {
+export function setupCanvas(canvas, heightCss) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.style.display = "block";
   canvas.style.width = "100%";
   canvas.style.maxWidth = "100%";
-  canvas.style.height = `${heightCss}px`;
-  const width = Math.max(1, Math.floor(canvas.getBoundingClientRect().width));
+
+  const parent = canvas.parentElement;
+  let height;
+  if (heightCss != null) {
+    canvas.style.height = `${heightCss}px`;
+    height = heightCss;
+  } else {
+    canvas.style.height = "100%";
+    height = Math.max(
+      1,
+      Math.floor(parent?.clientHeight || canvas.getBoundingClientRect().height || 280),
+    );
+  }
+
+  const width = Math.max(
+    1,
+    Math.floor(canvas.getBoundingClientRect().width || parent?.clientWidth || 1),
+  );
   canvas.width = Math.floor(width * dpr);
-  canvas.height = Math.floor(heightCss * dpr);
+  canvas.height = Math.floor(height * dpr);
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, width, height: heightCss };
+  return { ctx, width, height };
 }
 
 const PAD = { top: 14, right: 12, bottom: 28, left: 44 };
-
-export function plotRect(width, height) {
-  return {
-    x0: PAD.left,
-    y0: PAD.top,
-    w: width - PAD.left - PAD.right,
-    h: height - PAD.top - PAD.bottom,
-  };
-}
-
-/** Extra left room for per-azimuth degree labels. */
-export function plotRectAzimuthVertical(width, height) {
-  const left = 58;
-  return {
-    x0: left,
-    y0: PAD.top,
-    w: width - left - PAD.right,
-    h: height - PAD.top - PAD.bottom,
-  };
-}
-
-/** Extra bottom room for per-azimuth degree labels on X. */
-export function plotRectAzimuthHorizontal(width, height) {
-  const bottom = 42;
-  return {
-    x0: PAD.left,
-    y0: PAD.top,
-    w: width - PAD.left - PAD.right,
-    h: height - PAD.top - bottom,
-  };
-}
 
 /** Shared plot area for side-by-side comparison charts (azimuth + frequency). */
 export function plotRectComparison(width, height) {
@@ -69,9 +54,6 @@ const COMPARISON_GRID = {
   freqXTicks: 9,
   fontSize: 9,
 };
-
-/** Canvas CSS height for paired comparison charts (azimuth + frequency). */
-export const COMPARISON_CHART_HEIGHT = 280;
 
 /** Frequency on Y: extra left for Hz ticks; optional compact strip layout. */
 export function plotRectFrequencyProfile(width, height, { compact = false, detailed = false } = {}) {
@@ -620,33 +602,7 @@ function drawFrequencyYTicksByHz(
   }
 }
 
-export function drawGrid(ctx, rect, width, height) {
-  const c = getChartColors();
-  ctx.fillStyle = c.bg;
-  ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = c.grid;
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 4; i++) {
-    const y = rect.y0 + (rect.h * i) / 4;
-    ctx.beginPath();
-    ctx.moveTo(rect.x0, y);
-    ctx.lineTo(rect.x0 + rect.w, y);
-    ctx.stroke();
-  }
-}
-
-export function drawOutlierBands(ctx, rect, regions, tMin, tMax) {
-  if (!regions?.length || tMax <= tMin) return;
-  const span = tMax - tMin;
-  ctx.fillStyle = getChartColors().outlierFill;
-  for (const r of regions) {
-    const x0 = rect.x0 + ((r.start_s - tMin) / span) * rect.w;
-    const x1 = rect.x0 + ((r.end_s - tMin) / span) * rect.w;
-    ctx.fillRect(x0, rect.y0, x1 - x0, rect.h);
-  }
-}
-
-export function minMax(arr) {
+function minMax(arr) {
   let lo = Infinity;
   let hi = -Infinity;
   for (let i = 0; i < arr.length; i++) {
@@ -669,7 +625,7 @@ function finiteValues(arr) {
   return (arr ?? []).filter((v) => Number.isFinite(v));
 }
 
-export function drawLineSeries(
+function drawLineSeries(
   ctx,
   rect,
   xs,
@@ -708,7 +664,7 @@ export function drawLineSeries(
   ctx.restore();
 }
 
-export function drawScatter(
+function drawScatter(
   ctx,
   rect,
   xs,
@@ -735,7 +691,7 @@ export function drawScatter(
   }
 }
 
-export function drawAxisLabels(ctx, width, height, xLabel, yLabel) {
+function drawAxisLabels(ctx, width, height, xLabel, yLabel) {
   ctx.fillStyle = getChartColors().label;
   ctx.font = "11px 'DM Sans', system-ui, sans-serif";
   ctx.textAlign = "center";
@@ -748,7 +704,7 @@ export function drawAxisLabels(ctx, width, height, xLabel, yLabel) {
 }
 
 /** Map display azimuth (0° = front) to canvas radians; front at top. */
-export function azimuthToCanvasRad(azimuthDeg) {
+function azimuthToCanvasRad(azimuthDeg) {
   return ((azimuthDeg - 90) * Math.PI) / 180;
 }
 
@@ -768,7 +724,7 @@ function polarLayout(width, height) {
 }
 
 /** Rings, cardinal labels, listener — shared polar backdrop. */
-export function drawPolarGuides(ctx, width, height, footer = "Listener (top = front)") {
+function drawPolarGuides(ctx, width, height, footer = "Listener (top = front)") {
   const c = getChartColors();
   const { size, cx, cy, maxR, dotR, labelOffset } = polarLayout(width, height);
 
@@ -814,87 +770,16 @@ export function drawPolarGuides(ctx, width, height, footer = "Listener (top = fr
   return polarLayout(width, height);
 }
 
-function valueToRadius(value, lo, hi, maxR) {
-  const span = hi - lo || 1;
-  const t = Math.max(0, Math.min(1, (value - lo) / span));
-  return maxR * t;
-}
-
-function drawPolarValueSpokes(ctx, layout, azimuths, values, color, lo, hi, { lineWidth = 2.25 } = {}) {
-  const { cx, cy, maxR } = layout;
-  const c = getChartColors();
-
-  for (let i = 0; i < azimuths.length; i++) {
-    const rad = azimuthToCanvasRad(azimuths[i]);
-    const r = valueToRadius(values[i], lo, hi, maxR);
-    const x = cx + Math.cos(rad) * r;
-    const y = cy + Math.sin(rad) * r;
-
-    ctx.strokeStyle = c.polarGuide;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(rad) * maxR, cy + Math.sin(rad) * maxR);
-    ctx.stroke();
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, layout.dotR * 0.65, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-/**
- * Polar plot: radial lines from listener toward each azimuth; length encodes value.
- * Optional reference spokes (muted) behind measured.
- */
-export function drawPolarAzimuthValues(
-  ctx,
-  width,
-  height,
-  azimuths,
-  values,
-  { reference = null, unit = "", valueLabel = "Value" } = {},
-) {
-  if (!azimuths?.length || !values?.length) return;
-
-  const footer = reference?.length
-    ? `Line length = ${valueLabel} · top = front`
-    : `Line length = ${valueLabel} (${unit}) · top = front`;
-  const layout = drawPolarGuides(ctx, width, height, footer);
-
-  const all = [...values, ...(reference ?? [])];
-  const { lo, hi } = minMax(all);
-  const c = getChartColors();
-
-  if (reference?.length) {
-    drawPolarValueSpokes(ctx, layout, azimuths, reference, c.muted, lo, hi, {
-      lineWidth: 1.75,
-    });
-  }
-  drawPolarValueSpokes(ctx, layout, azimuths, values, c.accent, lo, hi);
-}
-
-/**
- * Polar direction-accuracy map: guide spokes per azimuth (no accuracy dots).
- */
-export function drawPolarAccuracy(ctx, width, height, perDirection) {
-  if (!perDirection?.length) return;
+/** Polar map: guide spokes per azimuth (no value encoding yet). */
+export function drawPolarAccuracy(ctx, width, height, azimuths) {
+  if (!azimuths?.length) return;
 
   const layout = drawPolarGuides(ctx, width, height);
   const { cx, cy, maxR } = layout;
   const c = getChartColors();
 
-  for (const d of perDirection) {
-    const rad = azimuthToCanvasRad(d.azimuth);
+  for (const az of azimuths) {
+    const rad = azimuthToCanvasRad(az);
     ctx.strokeStyle = c.polarGuide;
     ctx.lineWidth = 1.25;
     ctx.beginPath();
@@ -1288,11 +1173,9 @@ export function drawFrequencyProfileChart(
     yLabel = "Value",
     showAxisLabels = true,
     reference = null,
-    overlay = null,
     detailed = false,
     showPrimary = true,
     showReference = true,
-    showOverlay = true,
     comparisonLayout = false,
     freqAxisScale = "mel",
     swapAxes = false,
@@ -1309,13 +1192,11 @@ export function drawFrequencyProfileChart(
       f,
       v: values[i],
       r: reference?.[i],
-      o: overlay?.[i],
     }))
     .sort((a, b) => a.f - b.f);
   const fSorted = order.map((p) => p.f);
   const vSorted = order.map((p) => p.v);
   const refSorted = reference?.length ? order.map((p) => p.r) : null;
-  const overlaySorted = overlay?.length ? order.map((p) => p.o) : null;
 
   const c = getChartColors();
   ctx.fillStyle = c.bg;
@@ -1325,7 +1206,6 @@ export function drawFrequencyProfileChart(
   const all = [
     ...(showPrimary ? finiteValues(vSorted) : []),
     ...(showReference && refSorted ? finiteValues(refSorted) : []),
-    ...(showOverlay && overlaySorted ? finiteValues(overlaySorted) : []),
   ];
   if (!all.length) return;
   const { lo, hi } = minMax(all);
@@ -1430,24 +1310,6 @@ export function drawFrequencyProfileChart(
       drawProfileScatterByFreq(ctx, rect, fSorted, vSorted, c.accent, vLo, vHi, fMin, fMax, fPad, hzScale, selStyle);
     }
   }
-  if (showOverlay && overlaySorted?.length) {
-    const overlayStyle = { lineWidth: 1.25, dashed: false, pointRadius: 2.5, pointHollow: false };
-    if (swapAxes) {
-      if (useBands) {
-        drawProfileLineByBinSwapped(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
-        drawProfileScatterByBinSwapped(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
-      } else {
-        drawProfileLineSwapped(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
-        drawProfileScatterSwapped(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
-      }
-    } else if (useBands) {
-      drawProfileLineByBin(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad);
-      drawProfileScatterByBin(ctx, rect, overlaySorted, nBins, c.series, vLo, vHi, binPad, overlayStyle);
-    } else {
-      drawProfileLineByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
-      drawProfileScatterByFreq(ctx, rect, fSorted, overlaySorted, c.series, vLo, vHi, fMin, fMax, fPad, hzScale, overlayStyle);
-    }
-  }
   if (showReference && refSorted?.length) {
     if (swapAxes) {
       if (useBands) {
@@ -1495,71 +1357,4 @@ function drawAzimuthYTicks(ctx, rect, azimuths, azMin, azMax) {
     ctx.stroke();
     ctx.fillText(`${az}°`, rect.x0 - 6, y);
   }
-}
-
-/** Vertical line plot: azimuth on Y, value on X (optionally vs reference). */
-export function drawAzimuthLineChartVertical(
-  ctx,
-  rect,
-  azimuths,
-  values,
-  width,
-  height,
-  { yLabel = "Value", reference = null } = {},
-) {
-  if (!azimuths?.length || !values?.length) return;
-
-  const c = getChartColors();
-  ctx.fillStyle = c.bg;
-  ctx.fillRect(0, 0, width, height);
-
-  const { xs, sorted } = sortAzimuthSeries(azimuths, values, reference);
-  const measured = sorted[0];
-  const ref = sorted[1];
-
-  const all = [...measured, ...(ref ?? [])];
-  const { lo, hi } = minMax(all);
-  const pad = (hi - lo) * 0.1 || 1;
-  const vLo = lo - pad;
-  const vHi = hi + pad;
-  const azMin = Math.min(...xs);
-  const azMax = Math.max(...xs);
-
-  drawAzimuthYTicks(ctx, rect, xs, azMin, azMax);
-
-  ctx.strokeStyle = c.grid;
-  ctx.lineWidth = 1;
-  for (let i = 1; i < 4; i++) {
-    const x = rect.x0 + (rect.w * i) / 4;
-    ctx.beginPath();
-    ctx.moveTo(x, rect.y0);
-    ctx.lineTo(x, rect.y0 + rect.h);
-    ctx.stroke();
-  }
-
-  if (ref?.length) {
-    drawVerticalLineSeries(ctx, rect, xs, ref, c.muted, azMin, azMax, vLo, vHi);
-    drawVerticalScatter(ctx, rect, xs, ref, c.muted, azMin, azMax, vLo, vHi, 2.5);
-  }
-  drawVerticalLineSeries(ctx, rect, xs, measured, c.accent, azMin, azMax, vLo, vHi);
-  drawVerticalScatter(ctx, rect, xs, measured, c.accent, azMin, azMax, vLo, vHi, 3);
-  drawAxisLabels(ctx, width, height, yLabel, "Azimuth (°)");
-}
-
-/** ILD vs azimuth at one frequency: measured vs reference. */
-export function drawAzimuthProfile(
-  ctx,
-  rect,
-  azimuths,
-  measured,
-  reference,
-  width,
-  height,
-  { showMeasured = true, showReference = true } = {},
-) {
-  drawAzimuthLineChart(ctx, rect, azimuths, measured, width, height, {
-    yLabel: "ILD (dB)",
-    reference: showReference ? reference : null,
-    showPrimary: showMeasured,
-  });
 }

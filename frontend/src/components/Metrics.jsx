@@ -3,11 +3,6 @@ export default function Metrics({ summary }) {
 
   const items = [
     { label: "Subject records", value: String(summary.nRecords) },
-    {
-      label: "Direction accuracy",
-      value:
-        summary.directionAccuracyPct != null ? `${summary.directionAccuracyPct}%` : "—",
-    },
   ];
 
   return (

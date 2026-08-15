@@ -1,10 +1,10 @@
-"""Directional localization accuracy vs unaided reference."""
+"""Unaided reference alignment for thestruct comparison charts."""
 
 from __future__ import annotations
 
 import numpy as np
 
-from acoustic_analysis.azimuth import remap_azimuth, remap_azimuth_list
+from acoustic_analysis.azimuth import remap_azimuth_list
 from acoustic_analysis.thestruct import MATRIX_FIELDS, ThestructFile, ThestructRecord
 
 REFERENCE_AID = "Unaid"
@@ -77,44 +77,12 @@ def compute_direction_accuracy(
     selected: ThestructRecord,
     reference: ThestructRecord,
 ) -> dict:
-    """
-    Compare ILD/ITD maps to reference and score each source azimuth.
-
-    Lower error vs unaided → higher accuracy (preserved spatial cues).
-    """
+    """Align unaided reference matrices to the selected record grid."""
     ref = align_reference_to_selected(selected, reference)
-
-    ild_err = selected.normILD - ref["normILD"]
-    itd_err = selected.normITD - ref["normITD"]
-
-    ild_scale = max(float(np.std(ref["normILD"])), 1.0)
-    itd_scale = max(float(np.std(ref["normITD"])), 50.0)
-
-    n_az = len(selected.azimuths)
-    per_direction: list[dict] = []
-
-    for i in range(n_az):
-        ild_rms = float(np.sqrt(np.mean(ild_err[i, :] ** 2)))
-        itd_rms = float(np.sqrt(np.mean(itd_err[i, :] ** 2)))
-        combined = np.sqrt((ild_rms / ild_scale) ** 2 + (itd_rms / itd_scale) ** 2)
-        accuracy_pct = round(100 * float(np.exp(-combined)), 1)
-
-        per_direction.append(
-            {
-                "azimuth": remap_azimuth(int(selected.azimuths[i])),
-                "accuracyPct": accuracy_pct,
-            }
-        )
-
-    accuracies = [d["accuracyPct"] for d in per_direction]
-    overall = round(float(np.mean(accuracies)), 1) if accuracies else 0.0
-
     return {
         "hasReference": True,
         "referenceAid": reference.aid,
         "referenceLabel": reference.label,
-        "overallAccuracyPct": overall,
-        "perDirection": per_direction,
         "referenceMatrices": {
             field: _round_matrix(ref[field].tolist()) for field in MATRIX_FIELDS
         },
@@ -136,8 +104,6 @@ def direction_accuracy_payload(
             "hasReference": False,
             "referenceAid": REFERENCE_AID,
             "referenceLabel": None,
-            "overallAccuracyPct": None,
-            "perDirection": [],
             "reason": reason,
             "referenceMatrices": None,
         }
