@@ -35,9 +35,6 @@ export default function Sidebar({
   onOsfFile,
   loading,
   error,
-  thestructRecords,
-  recordIndex,
-  onRecordIndex,
   onToggleTheme,
   isLight,
 }) {
@@ -101,23 +98,6 @@ export default function Sidebar({
             }}
           />
         </label>
-
-        {thestructRecords?.length > 0 && (
-          <label className="field">
-            <span>Record (aid · room · run)</span>
-            <select
-              value={recordIndex}
-              disabled={loading}
-              onChange={(e) => onRecordIndex?.(Number(e.target.value))}
-            >
-              {thestructRecords.map((r) => (
-                <option key={r.index} value={r.index}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
 
         {loading && <p className="status loading">Analyzing…</p>}
         {error && <p className="status error">{error}</p>}

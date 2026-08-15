@@ -819,6 +819,48 @@ td {
   margin: 0.25rem 0;
 }
 
+.record-summary-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.record-summary-header h3 {
+  margin: 0;
+}
+
+.record-selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1rem;
+}
+
+.record-selector-field {
+  margin-bottom: 0;
+}
+
+.record-selector-field select {
+  width: auto;
+  min-width: 8rem;
+}
+
+@media (max-width: 640px) {
+  .record-selector {
+    width: 100%;
+  }
+
+  .record-selector-field {
+    flex: 1 1 8rem;
+  }
+
+  .record-selector-field select {
+    width: 100%;
+  }
+}
+
 .direction-accuracy .small {
   font-size: 0.75rem;
   margin: 0.15rem 0 0.5rem;
